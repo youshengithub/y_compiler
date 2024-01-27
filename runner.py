@@ -31,11 +31,12 @@ class Runner:
                 ans+=int(self.memory[int(texts[1][1:])])
             else:
                 ans+=int(texts[1])
-            return "pos",int(ans)
+            return "pos",ans+self.base
     def RUN(self,lines): #注意到操作数可以是real $1 var
-        max_memory=1000
+        max_memory=100000
         self.jump=0
-        self.memory=[0 for i in range(1000)]
+        self.base=0
+        self.memory=[0 for i in range(max_memory)]
         start_time = time.time()
         ip=1
         VARS={"EAX":100, "EBX":101}

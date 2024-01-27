@@ -245,6 +245,10 @@ class Compoment:
         elif(self.name=="PRINT"):
             code="OUT "+str(oplist[0])+"\n"
             pass
+        elif(self.name=="FUNC"):
+            pass
+        elif(self.name=="CALL"):
+            pass
         return code
     def Rrcognize(self,text,VarPos,toprule="",prefix=""):
         #如果是repeat的话 还需要重复！
