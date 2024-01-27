@@ -1,4 +1,12 @@
-
+FUNC hello(a,b,c,d,e,){
+    DIM a;
+    DIM b;
+    DIM c;
+    DIM d;
+    WHILE(c<10;){
+    c=c+1;
+};
+};
 //DIM a; //hello
 //DIM b;
 //DIM c;
@@ -21,26 +29,26 @@
 //
 //IF(c>0;){c=c+1;}ELSE{c=c-1;};
 //PRINT(c);
-DIM a[10]; //hello
-DIM b;
-DIM c;
-DIM d;
-a[0]=1000;
-b=0;
-d=1;
-
-FOR(c=0;c<10;c=c+1;){
-    c=c+1;
-    c=c-1;
-    IF(d==1;){
-        b=b+1/((2*c)+1);
-        d=0;
-    }ELSE{
-        b=b-1/((2*c)+1);
-        d=1;        
-    };
-    a[c]=c;
-    PRINT(a[c]);
-};
-b=b*4;
-PRINT(b);
+//DIM a[10]; //hello
+//DIM b;
+//DIM c;
+//DIM d;
+//a[0]=1000;
+//b=0;
+//d=1;
+//
+//FOR(c=0;c<10;c=c+1;){
+//    c=c+1;
+//    c=c-1;
+//    IF(d==1;){
+//        b=b+1/((2*c)+1);
+//        d=0;
+//    }ELSE{
+//        b=b-1/((2*c)+1);
+//        d=1;        
+//    };
+//    a[c]=c;
+//    PRINT(a[c]);
+//};
+//b=b*4;
+//PRINT(b);

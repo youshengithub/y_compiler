@@ -44,7 +44,7 @@ class Compoment:
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
                     
-                    if(self.name=="VAR"):
+                    if(self.name=="VAR"): #需要进行判断是什么词性
                         num_groups = len(match.groups())
                         var_length="1"
                         var_name=match.group(1)
@@ -64,6 +64,8 @@ class Compoment:
                             second="$"+str(VarPos[var_length])
                         oplist.append(first+second) # #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！
                     elif(self.name=="CONST"):
+                        oplist.append(match.group(0))
+                    elif(self.name=="FUNCNAME"): #需要有一个table 
                         oplist.append(match.group(0))
                 else:
                     
@@ -249,6 +251,11 @@ class Compoment:
             pass
         elif(self.name=="CALL"):
             pass
+        elif(self.name=="FUNCNAME"):
+            pass
+        elif(self.name=="PAR"):
+            
+            pass
         return code
     def Rrcognize(self,text,VarPos,toprule="",prefix=""):
         #如果是repeat的话 还需要重复！
@@ -275,11 +282,11 @@ class Compoment:
                         succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[(text,self.name,rule)]
                 else:
                     Compoment.unmatch[(textc,self.name,rule)]="PROCESSING"
-                    #print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
+                    print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
                     succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[(textc,self.name,rule)]=(succ,text,VarPos,oplist,code_list,logs1)
                     #所以就算是解析成功也无法返回
-                    #print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
+                    print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
                 if(succ):
                     flag=True
                     repeat=self.repeat
@@ -366,6 +373,7 @@ class Compiler:
         content_without_newlines = content.replace('\n', '').replace(' ', '').replace('\t', '')
         print(content,content_without_newlines)
         self.error=False
+        #做好预处理，先把函数的编译出来，然后在这里进行组装,
         return self.ana(content_without_newlines,"",{"SUM":0})
 a=Compiler()
 b=Runner()
@@ -389,3 +397,4 @@ b.Run_from_code(code.split("\n"))
 #JMP
 #OUT
 #RF
+#TO
