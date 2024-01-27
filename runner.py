@@ -21,6 +21,7 @@ class Runner:
         pass
     def RUN(self,lines):
         start_time = time.time()
+        current_alloc=0
         ip=1
         VARS={"EAX":100, "EBX":101}
         keywordss=[]
@@ -29,7 +30,8 @@ class Runner:
         while(ip<=len(lines)):
             keywords=keywordss[ip-1]
             if(keywords[0]=="ALLOC"):
-               VARS[keywords[1]]=int(keywords[2]) 
+               VARS[keywords[1]]=current_alloc
+               current_alloc+=int(keywords[2]) #注意到操作数可以是real $1 var
             elif(keywords[0]=="MOV"):
                 if(keywords[2] in VARS):
                     self.memory[VARS[keywords[1]]]=self.memory[VARS[keywords[2]]]

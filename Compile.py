@@ -39,14 +39,23 @@ class Compoment:
                     return False,text_c,VarPos,oplist,codelist,r_logs
                 pattern=rule[1:next_index+1] 
                 match = re.search(pattern, text)
-                if match!=None and match.regs[0][0]==0:
+                if match!=None :
                     #print("变量解析成功:",text,pattern)
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
+                    
                     if(self.name=="VAR"):
-                        if(match.group(0) not in VarPos): 
-                            VarPos[match.group(0)]=len(VarPos)
-                    oplist.append(match.group(0))
+                        num_groups = len(match.groups())
+                        var_length=1
+                        var_name=match.group(1)
+                        if(match.group(2)!=None):
+                            var_length=match.group(2)[1:-1] #这里是字符串
+                        if(var_name not in VarPos): 
+                            VarPos[var_name]=var_length
+                        oplist.append(var_name)
+                        
+                    elif(self.name=="CONST"):
+                        oplist.append(match.group(0))
                 else:
                     
                     return False,text_c,VarPos,oplist,codelist,r_logs
@@ -78,8 +87,9 @@ class Compoment:
         #print(codelist,oplist)
         code=""
         if(self.name=="VAR"): #如果是VARS需要对其做出修正！例如是a 100那就要翻译成a-100直接
-            #code=oplist[0]+"-----"+"\n"
-            pass
+            if("[$OPN$]" in rule):
+                pass
+            
         elif(self.name=="CONST"):
             pass
         elif(self.name=="DIM"):
@@ -250,11 +260,11 @@ class Compoment:
                         succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[(text,self.name,rule)]
                 else:
                     Compoment.unmatch[(textc,self.name,rule)]="PROCESSING"
-                    print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
+                    #print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
                     succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[(textc,self.name,rule)]=(succ,text,VarPos,oplist,code_list,logs1)
                     #所以就算是解析成功也无法返回
-                    print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
+                    #print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
                 if(succ):
                     flag=True
                     repeat=self.repeat
@@ -271,6 +281,8 @@ class Compoment:
 
 class Compiler:
     #VARPos=环境
+    def __init__(self) -> None:
+        self.error=False
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""
         if(text==""):
@@ -282,18 +294,21 @@ class Compiler:
             if(sentence.no_start==True): continue
             if(text.startswith("c>0;)") and name=="$JUDGE$"):
                  debug=1
-            print(prefix+"[ ","解析语法中 规则名称: ",name," 代码:",text)
+            #print(prefix+"[ ","解析语法中 规则名称: ",name," 代码:",text)
             succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(text,VarPos,"",prefix+"   ")
-            print(prefix,"解析语法结果 状态:",succ,"规则名称: ",name, " Text: ",text[:len(text)-len(textc)],"codes:",code+" ]")
+            #print(prefix,"解析语法结果 状态:",succ,"规则名称: ",name, " Text: ",text[:len(text)-len(textc)],"codes:",code+" ]")
             if(succ==True):
                 succ,true_code,VarPos,logs2=self.ana(textc,codes+code,VarPos,"   "+prefix) #代码都是至上往下的
                 r_logs=logs2+"\n"+logs1
-                #print(logs1)
-                #print("解析规则 状态:",succ,"规则名称: ",k, " Text: ",text[:len(text)-len(textc)],"codes:",code)
                 if(succ==True):    
                     codes=true_code
                     flag=True
-                    break #只能有一种 不能
+                    break #只能有一种 不能再加了！
+                else:
+                    if(self.error==False):
+                        self.error=True
+                        print("编译错误！,当前编译位置:",textc)
+                    #return False,codes,VarPos,r_logs #这句话不知道该不该加上去！！！！
         return flag,codes,VarPos,r_logs
     def revise_config(self,original_str):
         pattern = r"<(.*?)>"
@@ -335,6 +350,7 @@ class Compiler:
 
         content_without_newlines = content.replace('\n', '').replace(' ', '').replace('\t', '')
         print(content,content_without_newlines)
+        self.error=False
         return self.ana(content_without_newlines,"",{})
 a=Compiler()
 b=Runner()

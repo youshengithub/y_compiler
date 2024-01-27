@@ -1,7 +1,8 @@
-DIM a; //hello
-DIM b;
-DIM c;
-DIM d;
+
+//DIM a; //hello
+//DIM b;
+//DIM c;
+//DIM d;
 //b=0;
 //c=0;
 //a=(1+(1+(1/2)/2))/2;
@@ -20,9 +21,14 @@ DIM d;
 //
 //IF(c>0;){c=c+1;}ELSE{c=c-1;};
 //PRINT(c);
-a=1000;
+DIM a[10]; //hello
+DIM b;
+DIM c;
+DIM d;
+a[1]=1000;
 b=0;
 d=1;
+DIM ans;
 FOR(c=0;c<100000;c=c+1;){
     c=c+1;
     c=c-1;
@@ -33,6 +39,8 @@ FOR(c=0;c<100000;c=c+1;){
         b=b-1/((2*c)+1);
         d=1;        
     };
+    ans=b*4;
+    //PRINT(ans);
 };
 b=b*4;
 PRINT(b);
