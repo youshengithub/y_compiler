@@ -1,0 +1,20 @@
+ALLOC a 0
+ALLOC b 1
+ALLOC c 2
+ALLOC d 3
+MOV a 1
+MOV b 1
+MOV c 0
+MOV d 1
+LESS d 10
+JPIF 10
+MOV EAX a
+ADD EAX b
+MOV c EAX
+MOV a b
+MOV b c
+MOV EAX d
+ADD EAX 1
+MOV d EAX
+JMP -10
+OUT c
