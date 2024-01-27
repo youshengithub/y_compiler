@@ -28,7 +28,7 @@ DIM d;
 a[1]=1000;
 b=0;
 d=1;
-DIM ans;
+
 FOR(c=0;c<100000;c=c+1;){
     c=c+1;
     c=c-1;
@@ -39,8 +39,9 @@ FOR(c=0;c<100000;c=c+1;){
         b=b-1/((2*c)+1);
         d=1;        
     };
+    DIM ans;
     ans=b*4;
-    //PRINT(ans);
+    PRINT(ans);
 };
 b=b*4;
 PRINT(b);

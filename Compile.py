@@ -51,9 +51,10 @@ class Compoment:
                         if(match.group(2)!=None):
                             var_length=match.group(2)[1:-1] #这里是字符串
                         if(var_name not in VarPos): 
-                            VarPos[var_name]=var_length
+                            VarPos[var_name]=VarPos["SUM"]
+                            VarPos["SUM"]+=int(var_length)
+                        #oplist.append("$"+str(VarPos["SUM"])) #插入$100
                         oplist.append(var_name)
-                        
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
                 else:
@@ -351,7 +352,7 @@ class Compiler:
         content_without_newlines = content.replace('\n', '').replace(' ', '').replace('\t', '')
         print(content,content_without_newlines)
         self.error=False
-        return self.ana(content_without_newlines,"",{})
+        return self.ana(content_without_newlines,"",{"SUM":0})
 a=Compiler()
 b=Runner()
 a.construct_componets("Config.txt")

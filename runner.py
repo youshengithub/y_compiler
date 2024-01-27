@@ -19,7 +19,7 @@ import time
 class Runner:
     def __init__(self) -> None:
         pass
-    def RUN(self,lines):
+    def RUN(self,lines): #注意到操作数可以是real $1 var
         start_time = time.time()
         current_alloc=0
         ip=1
@@ -27,11 +27,13 @@ class Runner:
         keywordss=[]
         for line in lines:
             keywordss.append(line.split(" "))
+            #在这里可以对其进行预处理 使其都转换成位置 $1的形式
         while(ip<=len(lines)):
             keywords=keywordss[ip-1]
             if(keywords[0]=="ALLOC"):
-               VARS[keywords[1]]=current_alloc
-               current_alloc+=int(keywords[2]) #注意到操作数可以是real $1 var
+                if(keywords[1] not in VARS):
+                    VARS[keywords[1]]=current_alloc
+                    current_alloc+=int(keywords[2]) 
             elif(keywords[0]=="MOV"):
                 if(keywords[2] in VARS):
                     self.memory[VARS[keywords[1]]]=self.memory[VARS[keywords[2]]]
