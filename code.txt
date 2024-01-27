@@ -25,11 +25,11 @@ DIM a[10]; //hello
 DIM b;
 DIM c;
 DIM d;
-a[1]=1000;
+a[0]=1000;
 b=0;
 d=1;
 
-FOR(c=0;c<100000;c=c+1;){
+FOR(c=0;c<10;c=c+1;){
     c=c+1;
     c=c-1;
     IF(d==1;){
@@ -39,9 +39,8 @@ FOR(c=0;c<100000;c=c+1;){
         b=b-1/((2*c)+1);
         d=1;        
     };
-    DIM ans;
-    ans=b*4;
-    PRINT(ans);
+    a[c]=c;
+    PRINT(a[c]);
 };
 b=b*4;
 PRINT(b);

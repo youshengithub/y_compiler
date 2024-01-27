@@ -46,15 +46,23 @@ class Compoment:
                     
                     if(self.name=="VAR"):
                         num_groups = len(match.groups())
-                        var_length=1
+                        var_length="1"
                         var_name=match.group(1)
                         if(match.group(2)!=None):
                             var_length=match.group(2)[1:-1] #这里是字符串
                         if(var_name not in VarPos): 
                             VarPos[var_name]=VarPos["SUM"]
-                            VarPos["SUM"]+=int(var_length)
-                        #oplist.append("$"+str(VarPos["SUM"])) #插入$100
-                        oplist.append(var_name)
+                            VarPos["SUM"]+=int(var_length)#这里必须成果！
+                        first="$"+str(VarPos[var_name])+":"
+                        
+                        if(var_length.isdigit()==True):
+                            if(match.group(2)==None):
+                                second="0" #a=1 就是a[0]=1
+                            else:
+                                second=var_length
+                        else:
+                            second="$"+str(VarPos[var_length])
+                        oplist.append(first+second) # #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
                 else:
@@ -87,14 +95,16 @@ class Compoment:
     def Complie(self,rule,oplist,codelist,VarPos):
         #print(codelist,oplist)
         code=""
-        if(self.name=="VAR"): #如果是VARS需要对其做出修正！例如是a 100那就要翻译成a-100直接
-            if("[$OPN$]" in rule):
-                pass
-            
+        if(self.name=="VAR"): #如果是VARS需要对其做出修正！例如是a 100那就要翻译成a-100直接 #注意到！这里面可能有坑！需要real time计算位置
+            #可能会涉及到修改oplist a+i这边是静态 所以计算不出位置 需要写到代码里面去 所以必须设计新的指令系统
+            #MOV ECX $1
+            #ADD ECX i
+            #MOV $(11+$12)携程这种形式吧！
+            pass
         elif(self.name=="CONST"):
             pass
         elif(self.name=="DIM"):
-            code="ALLOC "+str(oplist[0])+" "+str(VarPos[oplist[0]])+"\n"
+            code="ALLOC "+str(oplist[0])+"\n"
             pass
         elif(self.name=="OP"):
             code=codelist[0]

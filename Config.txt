@@ -1,4 +1,4 @@
-VAR:@(^[a-z]{1,55}[0-9]{0,255})(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255}|-[0-9]{1,255})\])?@#:NO_START#
+VAR:@(^[a-z]{1,55}[0-9]{0,255})(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@#:NO_START#
 CONST:@^<-|>[0-9]{1,255}@#:NO_START#
 OPN:$VAR$#$CONST$#($OPN$):NO_START#
 OP:$ADD$#$SUB$#$MUL$#$DIV$#($OP$):NO_START#
@@ -16,3 +16,5 @@ DO:DO{$SENTENCE$}WHILE($JUDGE$);#:
 WHILE:WHILE($JUDGE$){$SENTENCE$};#:
 FOR:FOR($EQUAL$$JUDGE$$EQUAL$){$SENTENCE$};#:
 PRINT:PRINT($OPN$);#:
+PAR:$VAR$;#:NO_START:REPEAT#
+FUNC:FUNC$VAR$($PAR$){$SENTENCE$};
