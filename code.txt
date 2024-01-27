@@ -1,11 +1,15 @@
-FUNC hello(a,b,c,d,e,){
+FUNC hello(a1,b1,c1,d1,e1,){
     DIM a;
     DIM b;
     DIM c;
     DIM d;
     WHILE(c<10;){
+    DIM f;
     c=c+1;
-};
+    PRINT(c);
+    };
+    a=a+hello(a,b,c,);
+    RETURN a+1;
 };
 //DIM a; //hello
 //DIM b;

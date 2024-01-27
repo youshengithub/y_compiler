@@ -19,7 +19,7 @@ import time,re
 class Runner:
     def __init__(self) -> None:
         pass
-    def calc_pos(self,text): #通过此来计算和数据
+    def calc_pos(self,text,REGS): #通过此来计算和数据
         if("$" not in text):
             return "real",int(text)
         else:
@@ -31,32 +31,32 @@ class Runner:
                 ans+=int(self.memory[int(texts[1][1:])])
             else:
                 ans+=int(texts[1])
-            return "pos",ans+self.base
+            return "pos",ans+self.memory[REGS["EBP"]]
     def RUN(self,lines): #注意到操作数可以是real $1 var
         max_memory=100000
         self.jump=0
-        self.base=0
         self.memory=[0 for i in range(max_memory)]
         start_time = time.time()
         ip=1
-        VARS={"EAX":100, "EBX":101}
+        REGS={"EAX":max_memory-1, "EBX":max_memory-2,"EBP":max_memory-3,"ESP":max_memory-4}
         keywordss=[]
         for line in lines:
-            for k,v in VARS.items():
+            for k,v in REGS.items():
                 if(k in line):
                     line=line.replace(k,"$"+str(v)+":0")
             keywordss.append(line.split(" "))
 
         while(ip<=len(lines)):
-            
             keywords=keywordss[ip-1]
             #print("正在执行:",keywords)
-            if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1])
-            if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2])
+            if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
+            if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)
             if(keywords[0]=="ALLOC"):
-               if(op1+len(VARS)>=max_memory):
+               if(op1+len(REGS)>=max_memory):
                    print("栈溢出！")
                    return 
+               else:
+                   self.memory[REGS["ESP"]]=op1
             elif(keywords[0]=="MOV"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):
@@ -65,7 +65,7 @@ class Runner:
                     self.memory[op1]=op2
             elif(keywords[0]=="TO"):
                 assert(1==0)
-                self.memory[VARS[keywords[1]]]=self.memory[VARS[keywords[2]]]
+                self.memory[REGS[keywords[1]]]=self.memory[REGS[keywords[2]]]
             elif(keywords[0]=="ADD"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):
@@ -130,17 +130,23 @@ class Runner:
                 self.jump= not self.jump
             elif(keywords[0]=="JPIF"):
                 if(self.jump==True):
-                    assert(flag1=="real")
-                    ip+=op1
+                    if(flag1=="real"):
+                        ip+=op1
+                    else:
+                        ip+=self.memory[op1]
                     continue
             elif(keywords[0]=="JPNIF"):
                 if(self.jump==False):
-                    assert(flag1=="real")
-                    ip+=op1
+                    if(flag1=="real"):
+                        ip+=op1
+                    else:
+                        ip+=self.memory[op1]
                     continue    
             elif(keywords[0]=="JMP"):
-                assert(flag1=="real")
-                ip+=op1
+                if(flag1=="real"):
+                    ip+=op1
+                else:
+                    ip+=self.memory[op1]
                 continue
             elif(keywords[0]=="OUT"):
                 if(flag1=="pos"):
