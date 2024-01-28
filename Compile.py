@@ -404,6 +404,7 @@ class Compiler:
     def construct_componets(self,file_path): #仿佛可以对规则进行修改<$$|;>将进行排列组合
         with open(file_path, 'r') as file: #构造词类
             for line in file:
+                line=line.replace(' ', '')
                 temp=line.split(":")
                 name=temp[0]
                 configs=temp[1].split("#")
