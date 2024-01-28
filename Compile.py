@@ -342,8 +342,10 @@ class Compoment:
                     #在这里构建code!
                     #print(self.name,rule,oplist,code_list,VarPos)
                     compiled_code=self.Complie(rule,oplist,code_list,VarPos) 
-                    r_code+=compiled_code
-                    logs=logs1+"\n"+" Grammer: "+self.name+" Rule: "+rule+ " Text: "+textc[:len(textc)-len(text)]+" codes:"+compiled_code
+                    r_code+=compiled_code #+" Rule: "+rule
+                    this_log="***************Text*************** \n"+textc[:len(textc)-len(text)]+"\n***************Code***************\n"+compiled_code
+                    logs=logs1+this_log
+                    #print(this_log)
                     break   #这里仿佛也不应该call;最好是用 
 
         return flag,text,r_code,VarPos,r_oplist,logs
