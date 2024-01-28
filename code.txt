@@ -1,8 +1,20 @@
 FUNC hello(a1,b1,){
-        RETURN a1+b1;
+    PRINT(a1);
+    DIM ans;
+    IF(a1>10;){
+        ans=a1;
+        
+    }ELSE{
+        DIM tp;
+        tp=a1+1;
+        ans=hello(tp,b1,)+0;
+        PRINT(ans);
+    };
+    
+    RETURN ans+0; 
 };
 DIM a;
-a=123;
+a=1;
 a=hello(a,10,);
 PRINT(a);
 

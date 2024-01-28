@@ -224,7 +224,7 @@ class Compoment:
             code+="ADD ESP 1\n"
             pass
         elif(self.name=="RETURN"):
-            code=codelist[0] 
+            code=codelist[0] #JMP到最后才行！ 这里怎么写最后啊！
             pass
         return code
     def handelP(self,rule,text,VarPos,prefix): #按道理这个也应该返回一个oplist
@@ -334,11 +334,11 @@ class Compoment:
                         succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[(text,self.name,rule)]
                 else:
                     Compoment.unmatch[(textc,self.name,rule)]="PROCESSING"
-                    print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
+                    #print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
                     succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[(textc,self.name,rule)]=(succ,text,VarPos,oplist,code_list,logs1)
                     #所以就算是解析成功也无法返回
-                    print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
+                    #print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
                 if(succ):
                     flag=True
                     repeat=self.repeat
