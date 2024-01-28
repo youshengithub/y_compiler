@@ -30,7 +30,8 @@ class Runner:
                 else:
                     ans+=int(texts[1])
             else:
-                if(ans+self.memory[REGS["EBP"]]>=self.max_memory): #寄存器的地址不能加EBP
+                #只有一段，并且很明显是寄存器的区域,则不需要加ebp,因为这是在对寄存器寻址
+                if(ans<0): 
                     return "pos",ans
                 
                 #如果地址里面带有EBP ESP等等 那就不再需要去加基地址EBP
@@ -41,10 +42,11 @@ class Runner:
             return "real",int(text)
             
     def RUN(self,lines): #注意到操作数可以是real $1 var
+        REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7}
         self.max_memory=100000
-        self.memory=[0 for i in range(self.max_memory)]
+        self.memory=[0 for i in range(self.max_memory+len(REGS))]
         self.tags={} #这里用来记录程序中分配的tag tag 和jmp tag tag用@来表示 TAG @a JMP @a
-        REGS={"EAX":self.max_memory-1, "EBX":self.max_memory-2,"EBP":self.max_memory-3,"ESP":self.max_memory-4,"EIP":self.max_memory-5,"EFG":self.max_memory-6,"ETP":self.max_memory-7}
+        
         start_time = time.time()
         keywordss=[]
         for line in lines:
@@ -70,7 +72,7 @@ class Runner:
                     else:
                         self.tags[op1]=ip+2
                 else:
-                    if(op1+len(REGS)>=self.max_memory):
+                    if(op1>=self.max_memory):
                         print("栈溢出！")
                         return 
                     else:
