@@ -44,8 +44,8 @@ class Runner:
         self.max_memory=100000
         self.memory=[0 for i in range(self.max_memory)]
         self.tags={} #这里用来记录程序中分配的tag tag 和jmp tag tag用@来表示 TAG @a JMP @a
-        start_time = time.time()
         REGS={"EAX":self.max_memory-1, "EBX":self.max_memory-2,"EBP":self.max_memory-3,"ESP":self.max_memory-4,"EIP":self.max_memory-5,"EFG":self.max_memory-6,"ETP":self.max_memory-7}
+        start_time = time.time()
         keywordss=[]
         for line in lines:
             for k,v in REGS.items():
