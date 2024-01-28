@@ -51,6 +51,7 @@ class Runner:
             for k,v in REGS.items():
                 if(k in line):
                     line=line.replace(k,"$"+str(v))
+            print(line)
             keywordss.append(line.split(" "))
         while(True):
             

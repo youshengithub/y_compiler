@@ -1,3 +1,21 @@
+FUNC max(a,b,){
+    DIM ma;
+    IF(a>b;){
+        ma=a;
+    }ELSE{
+        ma=b;
+    };
+    RETURN ma;
+};
+FUNC min(a,b,){
+    DIM mi;
+    IF(a<b;){
+        mi=a;
+    }ELSE{
+        mi=b;
+    };
+    RETURN mi;
+};
 FUNC hello(a1,b1,){
     //PRINT(a1);
     DIM ans[100];
@@ -15,6 +33,10 @@ FUNC hello(a1,b1,){
 DIM a;
 a=1;
 a=hello(a,10,);
+PRINT(a);
+a=max(a,2,);
+PRINT(a);
+a=min(1,a,);
 PRINT(a);
 //DIM a; //hello
 //DIM b;
