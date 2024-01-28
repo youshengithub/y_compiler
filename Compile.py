@@ -148,7 +148,6 @@ class Compoment:
             code=codelist[0]+codelist[1]
             code+="RF\n"
             code+="JPIF -"+str((codelist[0]+codelist[1]).count("\n")+1)+"\n"
-            
             pass
         elif(self.name=="WHILE"):
             code=codelist[0]
@@ -167,19 +166,62 @@ class Compoment:
             code="OUT "+str(oplist[0])+"\n"
             pass
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
-            for i in codelist: code+=i
-            code+="JMP EBP\n"
+            
+            for i in codelist[1:]: code+=i #注意到这里已经完成了赋值 这里面分了三段
+            code+=codelist[0]
+            #先把东西都回复出来
+            code+="MOV ESP $0:-6\n"
+            #code+="MOV $EBP:-3 $EAX\n" EAX不恢复！
+            code+="MOV EBX $0:-3\n"
+            code+="MOV EFG $0:-2\n"
+            code+="MOV ETP $0:-1\n" #不用再跳转了！这里已经写好了参数了！ 注意到这里有一个坑按道理来说必须同时还原,
+            code+="MOV EBP $0:-5\n" #使用临时寄存器ETP暂时保存该跳转的结果。
+            code+="MOV EIP ETP\n"
             code="JMP "+str(code.count("\n")+1)+"\n"+code
+            code="ALLOC @"+oplist[0]+"\n"+code
+            VarPos.clear()
+            VarPos["SUM"]=0
             #code=codelist[0] #还没处理return问题嘞
             pass
         elif(self.name=="CALL"):#call 然后eax传入参数！
             #oplist[1] 就是标签名 base+最高， 然后把参数都move过去 然后base-最高，就ok了！
-            code="NOP\n"
+            #保存ESP和EBP
+            #这里不能这样计算 EAX无用了 因为不会被恢复
+            code="MOV EAX ESP\n"
+            code+="SUB EAX EBP\n"
+            code+="MOV $0:EAX ESP\n"
+            code+="MOV $1:EAX EBP\n"
+            code+="MOV $2:EAX EAX\n"
+            code+="MOV $3:EAX EBX\n"
+            code+="MOV $4:EAX EFG\n"
+            code+="MOV EBX EAX\n" #保存一下我要压ip的时候用
+            
+            code+="ADD ESP 6\n"
+            code+="MOV ETP ESP\n"
+            code+=codelist[0] #压入参数
+            
+            code+="MOV EAX EIP\n"
+            code+="ADD EAX 4\n"
+            code+="MOV $5:EBX EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
+            
+            code+="MOV EBP ETP\n" #压完了参数再给ebp复制
+            code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
+            #然后需要执行跳转！
             pass
         elif(self.name=="FUNCNAME"):
+            #if(self.name=="FUNC"):
+                
+            #这里可以分配标记！ 可以直接进行跳转标记
+            #ALLOC world
             pass
-        elif(self.name=="PAR"):
-            
+        elif(self.name=="PAR"):#这里是形参
+            #code="SUB EBP 1\n" #不太需要动EBP
+            pass
+        elif(self.name=="ARG"): #这里是call的实参 
+            code="MOV EAX ESP\n"
+            code+="SUB EAX EBP\n"
+            code+="MOV $0:EAX "+oplist[0]+"\n"
+            code+="ADD ESP 1\n"
             pass
         elif(self.name=="RETURN"):
             code=codelist[0] 
