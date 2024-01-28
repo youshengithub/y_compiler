@@ -14,13 +14,13 @@ class Compoment:
         self.repeat=repeat_
         self.no_start=no_start
     def Complie(self,rule,oplist,codelist,VarPos):
-        #print(codelist,oplist)
         code=""
         if(self.name=="VAR"): #如果是VARS需要对其做出修正！例如是a 100那就要翻译成a-100直接 #注意到！这里面可能有坑！需要real time计算位置
             #可能会涉及到修改oplist a+i这边是静态 所以计算不出位置 需要写到代码里面去 所以必须设计新的指令系统
             #MOV ECX $1
             #ADD ECX i
             #MOV $(11+$12)携程这种形式吧！
+            #其实应该在这里进行修正
             pass
         elif(self.name=="CONST"):
             pass
@@ -111,9 +111,13 @@ class Compoment:
                 pass
             pass
         elif(self.name=="SENTENCE"):
-            if(len(codelist)!=0):code=codelist[0]
+            for i in codelist: code+=i 
             pass
         elif(self.name=="JUDGE"):
+            if(rule.find("<=")!=-1):
+                pass
+            elif(rule.find(">=")!=-1):
+                pass
             if(rule.find("<")!=-1):
                 code="LESS "+oplist[0]+" "+oplist[1]+"\n"
             elif(rule.find(">")!=-1):
@@ -123,20 +127,16 @@ class Compoment:
             elif(rule.find("!=")!=-1):
                 code="EQUAL "+oplist[0]+" "+oplist[1]+"\n"
                 code+="RF\n"
-            pass
-        elif(self.name=="LOGIC"):
-            if(rule.find("&&")!=-1):
+            elif(rule.find("&&")!=-1):
                 code=codelist[0]
                 code+="JPIF "+str((codelist[1]).count("\n")+1)+"\n"
                 code+=codelist[1]
             elif(rule.find("||")!=-1):
-
                 code=codelist[0] #如果不是这样的就跳转到末尾
                 code+="JPNIF "+str((codelist[1]).count("\n")+1)+"\n"
                 code+=codelist[1]
-                pass
             else:
-                if(len(codelist)!=0):code=codelist[0]
+                for i in codelist: code+=i 
         elif(self.name=="IF"):
             code=codelist[0]
             code+="JPIF "+str((codelist[1]).count("\n")+2)+"\n"
@@ -166,10 +166,7 @@ class Compoment:
             code="OUT "+str(oplist[0])+"\n"
             pass
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
-            
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
-            #code+=codelist[0]
-            #先把东西都回复出来
             code+="MOV ESP $0:-6\n"
             #code+="MOV $EBP:-3 $EAX\n" EAX不恢复！
             code+="MOV EBX $0:-3\n"
@@ -210,7 +207,6 @@ class Compoment:
             pass
         elif(self.name=="FUNCNAME"):
             #if(self.name=="FUNC"):
-                
             #这里可以分配标记！ 可以直接进行跳转标记
             #ALLOC world
             pass
@@ -245,11 +241,6 @@ class Compoment:
         #print("HandleR: Rule:",rule," Text: ",text)
         r_logs=""
         while(rule!=""):
-            # if(rule==";" ): #注意到这是特殊规则
-            #     rule=rule[1:]
-            #     if(text.startswith(";")):
-            #         text=text[1:]
-            #     continue
             if(text.startswith("1") and rule=="$OPN$"):
                     debug=1
             if(rule[0]=="@"):
