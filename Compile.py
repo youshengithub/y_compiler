@@ -167,8 +167,8 @@ class Compoment:
             pass
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             
-            for i in codelist[1:]: code+=i #注意到这里已经完成了赋值 这里面分了三段
-            code+=codelist[0]
+            for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
+            #code+=codelist[0]
             #先把东西都回复出来
             code+="MOV ESP $0:-6\n"
             #code+="MOV $EBP:-3 $EAX\n" EAX不恢复！
@@ -224,7 +224,12 @@ class Compoment:
             code+="ADD ESP 1\n"
             pass
         elif(self.name=="RETURN"):
-            code=codelist[0] #JMP到最后才行！ 这里怎么写最后啊！
+            if("$OP$" in rule):
+                for i in codelist: code+=i #JMP到最后才行！ 这里怎么写最后啊！
+            elif("$OPN$" in rule):
+                code="MOV EAX "+oplist[0]+"\n"
+            else:
+                pass #啥也不返回
             pass
         return code
     def handelP(self,rule,text,VarPos,prefix): #按道理这个也应该返回一个oplist
