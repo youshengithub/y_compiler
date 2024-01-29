@@ -3,7 +3,8 @@ from runner import Runner
 # 打开文本文件
 
 
-
+class token:#token类
+    pass
 
 class Compoment:
     Cs={}   #语句类型
@@ -28,7 +29,7 @@ class Compoment:
             code="ALLOC "+str(oplist[0])+"\n"
             pass
         elif(self.name=="OP"):
-            code=codelist[0]
+            for i in codelist: code+=i 
             pass
         elif(self.name=="ADD"):
             if(rule=="$OPN$+$OPN$"):

@@ -24,7 +24,7 @@ FUNC hello(a1,b1,){
         ans[0]=a1;
     }ELSE{
         DIM tp;
-        tp=a1+1;
+        tp=a1+1/2;
         ans[0]=hello(tp,b1,);
         //PRINT(ans[0]);
     };
