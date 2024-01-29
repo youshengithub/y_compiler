@@ -1,4 +1,4 @@
-#IR支持16种指令
+#IR支持22种指令
 #ALLOC
 #MOV
 #ADD
@@ -10,6 +10,7 @@
 #NOR
 #XOR
 #MOD
+#LEA
 #GREATER
 #EQUAL
 #LESS
@@ -18,8 +19,10 @@
 #JMP
 #OUT
 #RF
-#TO
+#TO  操作数 [%|]$address[:[$|]address] %表示绝对引用  $表示相对与EBP的位置
 #NOP
+#PUSH
+#POP
 
 import time,re
 
@@ -40,18 +43,19 @@ class Runner:
                     ans+=int(texts[1])
             else:
                 #只有一段，并且很明显是寄存器的区域,则不需要加ebp,因为这是在对寄存器寻址
-                if(ans<0): 
+                if(ans<0 ): 
                     return "pos",ans
-                
-                #如果地址里面带有EBP ESP等等 那就不再需要去加基地址EBP
-            return "pos",ans+self.memory[REGS["EBP"]]
+            if("%" in text): #如果标记了是% 那就不需要加入基址
+                return "pos",ans
+            else:
+                 return "pos",ans+self.memory[REGS["EBP"]]
         elif ("@"  in text):
             return "tag",text[1:]
         else:
             return "real",int(text)
             
     def RUN(self,lines): #注意到操作数可以是real $1 var
-        REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7,"ETA":-8}
+        REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7}
         self.max_memory=100000
         self.memory=[0 for i in range(self.max_memory+len(REGS))]
         self.tags={} #这里用来记录程序中分配的tag tag 和jmp tag tag用@来表示 TAG @a JMP @a
@@ -150,6 +154,28 @@ class Runner:
                     self.memory[op1]= ~ int(self.memory[op2])
                 else:
                     self.memory[op1]= ~ int(op2)
+            elif(keywords[0]=="LEA"):
+                assert(flag1=="pos")
+                assert(flag2=="pos")
+                self.memory[op1]=op2
+                
+            elif(keywords[0]=="SEA"):#把M[M[op1]]放入op2
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[self.memory[op1]]= int(self.memory[op2])
+                else:
+                    self.memory[self.memory[op1]]= int(op2)
+            elif(keywords[0]=="PUSH"):
+                if(flag1=="pos"):
+                    self.memory[REGS["ESP"]]= int(self.memory[op1])
+                else:
+                    self.memory[REGS["ESP"]]= int(op1)
+                self.memory[REGS["ESP"]]+=1
+            elif(keywords[0]=="POP"):
+                assert(flag1=="pos")
+                self.memory[REGS["ESP"]]-=1
+                if(flag1=="pos"):
+                    self.memory[op1]=self.memory[REGS["ESP"]]
             elif(keywords[0]=="GREATER"):
                 if(flag1=="pos"):
                     if(flag2=="pos"):

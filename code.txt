@@ -33,8 +33,12 @@ FUNC hello(a1,b1,){
     };
     RETURN ans[0]; 
 };
+FUNC test(p1,){
+    *0=1020+23;
+};
 DIM a;
 DIM b;
+DIM bb[100];
 DIM c;
 a=1;
 a=hello(a,10,);
@@ -47,7 +51,10 @@ a=7;
 b=5;
 c=a%b;
 c=!(a+b);
-PRINT(c);
+c=&b[10];
+test(c,)
+PRINT(a);
+
 //DIM a; //hello
 //DIM b;
 //DIM c;

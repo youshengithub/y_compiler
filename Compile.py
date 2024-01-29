@@ -132,15 +132,40 @@ class Compoment:
                 pass
             pass
         elif(self.name=="GETP"):
+            code+="LEA EAX "+str(oplist[0])+"\n"
             pass
         elif(self.name=="SETP"):
+            if(rule=="*$OPN$"): #在此处对oplist进行修正！ or 插入指令  #总是会把计算压入stack
+                code+="PUSH "+str(oplist[0])+"\n"
+                #oplist=[]
+                #code="SEA  EAX" +str(oplist[0])+"\n"
+                pass
+            elif(rule=="*$OP$"):#eax是需要修正的结果 不支持 EBX也可能被人用掉了！ 我需要一个不会被人用掉的寄存器或者位置！
+                for i in codelist: code+=i #PUSH EBX POP
+                code+="PUSH EAX\n"
+                VarPos
+                pass
+            else:
+                pass
             pass
         elif(self.name=="EQUAL"):
+            #可能会有code针对左边的地方进行计算！
             if(rule=="$VAR$=$OPN$;"):
                 code="MOV "+str(oplist[0]) +" "+str(oplist[1])+"\n"
             elif(rule=="$VAR$=$OP$;"):   
                 code=codelist[0]
                 code+= "MOV "+str(oplist[0])  + " EAX\n"
+            elif(rule=="$SETP$=$OPN$;"):  #这里可能会有点问题 
+                for i in codelist: code+=i 
+                code+="POP EBX\n"
+                code+="SEA EBX "+str(oplist[-1])+"\n" #这里的oplist不一定多少个数据
+                pass
+            elif(rule=="$SETP$=$OP$;"):
+                for i in codelist: code+=i 
+                code+="POP EBX\n"
+                code+="SEA EBX EAX\n"
+                pass
+            else:
                 pass
             pass
         elif(self.name=="SENTENCE"):
@@ -224,7 +249,7 @@ class Compoment:
             code+="MOV $2:EAX EAX\n"
             code+="MOV $3:EAX EBX\n"
             code+="MOV $4:EAX EFG\n"
-            code+="MOV ETA EAX\n" #保存一下我要压ip的时候用
+            code+="MOV EBX EAX\n" #保存一下我要压ip的时候用
             
             code+="ADD ESP 6\n"
             code+="MOV ETP ESP\n"
@@ -232,7 +257,7 @@ class Compoment:
             
             code+="MOV EAX EIP\n"
             code+="ADD EAX 4\n"
-            code+="MOV $5:ETA EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
+            code+="MOV $5:EBX EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
             
             code+="MOV EBP ETP\n" #压完了参数再给ebp复制
             code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
