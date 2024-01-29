@@ -1,17 +1,26 @@
-#IR支持13种命令
+#IR支持16种指令
 #ALLOC
 #MOV
-#TO
 #ADD
 #SUB
 #MUL
 #DIV
+#AND
+#OR
+#NOR
+#XOR
+#MOD
 #GREATER
 #EQUAL
 #LESS
 #JPIF
+#JPNIF
 #JMP
 #OUT
+#RF
+#TO
+#NOP
+
 import time,re
 
 # 记录开始时间

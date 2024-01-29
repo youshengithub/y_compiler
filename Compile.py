@@ -380,7 +380,7 @@ class Compiler:
                 else:
                     if(self.error==False):
                         self.error=True
-                        print("编译错误！,当前编译位置:",textc)
+                        print("编译错误！,当前编译位置:",textc,"\nlog\n",logs2)
                     #return False,codes,VarPos,r_logs #这句话不知道该不该加上去！！！！
         return flag,codes,VarPos,r_logs
     def revise_config(self,original_str):
@@ -434,20 +434,3 @@ succ,code,varpos,logs=a.Complie_file("code.txt")
 b.Run_from_code(code.split("\n"))
 
 
-#IR支持16种指令
-#ALLOC
-#MOV
-#ADD
-#SUB
-#MUL
-#DIV
-#GREATER
-#EQUAL
-#LESS
-#JPIF
-#JPNIF
-#JMP
-#OUT
-#RF
-#TO
-#NOP
