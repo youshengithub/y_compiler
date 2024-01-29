@@ -5,14 +5,13 @@ FUNC max(a,b,){
         RETURN b;
     };
 };
+
 FUNC min(a,b,){
-    DIM mi;
     IF(a<b;){
-        mi=a;
+        RETURN b;
     }ELSE{
-        mi=b;
+        RETURN a;
     };
-    RETURN mi;
 };
 FUNC hello(a1,b1,){
     //PRINT(a1);
