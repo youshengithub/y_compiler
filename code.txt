@@ -46,6 +46,7 @@ PRINT(a);
 a=7;
 b=5;
 c=a%b;
+c=!(a+b);
 PRINT(c);
 //DIM a; //hello
 //DIM b;

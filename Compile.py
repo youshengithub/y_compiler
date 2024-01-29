@@ -122,6 +122,14 @@ class Compoment:
                 assert(1==0)
 
         elif(self.name=="NOT"): #处理单目运算符
+            if(rule=="!$OPN$"):
+                code="NOT EAX "+str(oplist[0])+"\n"
+            elif(rule=="!$OP$"):
+                code=codelist[0]
+                code+="MOV EBX EAX\n"
+                code+="NOT EAX EBX\n"
+            else:
+                pass
             pass
         elif(self.name=="GETP"):
             pass
@@ -216,15 +224,15 @@ class Compoment:
             code+="MOV $2:EAX EAX\n"
             code+="MOV $3:EAX EBX\n"
             code+="MOV $4:EAX EFG\n"
-            code+="MOV EBX EAX\n" #保存一下我要压ip的时候用
+            code+="MOV ETA EAX\n" #保存一下我要压ip的时候用
             
             code+="ADD ESP 6\n"
             code+="MOV ETP ESP\n"
-            code+=codelist[0] #压入参数
+            code+=codelist[0] #压入参数 EAX EBX 可用 EBP ETP 可用否？
             
             code+="MOV EAX EIP\n"
             code+="ADD EAX 4\n"
-            code+="MOV $5:EBX EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
+            code+="MOV $5:ETA EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
             
             code+="MOV EBP ETP\n" #压完了参数再给ebp复制
             code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
@@ -238,11 +246,20 @@ class Compoment:
         elif(self.name=="PAR"):#这里是形参
             #code="SUB EBP 1\n" #不太需要动EBP
             pass
-        elif(self.name=="ARG"): #这里是call的实参 
+        elif(self.name=="ARG"): #这里是call的实参  只能使用EAX了 但是我又需要计算op op的值必须要存在eax里面
+            #可以使用EAX 但是在算数的时候可能会使用任意参数啊！ 不要把EBX算数寄存器拿来用作控制！
             code="MOV EAX ESP\n"
             code+="SUB EAX EBP\n"
-            code+="MOV $0:EAX "+oplist[0]+"\n"
-            code+="ADD ESP 1\n"
+            if(rule=="$OPN$"):
+                code+="MOV $0:EAX "+oplist[0]+"\n"
+                
+            elif(rule=="$OP$"):
+                print("NOT_SUPPORT")
+                assert(1==0)
+                code+="MOV $0:EAX "+oplist[0]+"\n"
+            else:
+                pass
+            code+="ADD ESP 1\n"   
             pass
         elif(self.name=="RETURN"):
             if("$OP$" in rule):

@@ -51,7 +51,7 @@ class Runner:
             return "real",int(text)
             
     def RUN(self,lines): #注意到操作数可以是real $1 var
-        REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7}
+        REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7,"ETA":-8}
         self.max_memory=100000
         self.memory=[0 for i in range(self.max_memory+len(REGS))]
         self.tags={} #这里用来记录程序中分配的tag tag 和jmp tag tag用@来表示 TAG @a JMP @a
@@ -144,7 +144,12 @@ class Runner:
                     self.memory[op1]=int(self.memory[op1]) % int(self.memory[op2])
                 else:
                     self.memory[op1]=int(self.memory[op1]) % int(op2)
-                    
+            elif(keywords[0]=="NOT"):
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[op1]= ~ int(self.memory[op2])
+                else:
+                    self.memory[op1]= ~ int(op2)
             elif(keywords[0]=="GREATER"):
                 if(flag1=="pos"):
                     if(flag2=="pos"):
