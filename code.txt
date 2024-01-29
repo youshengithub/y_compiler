@@ -1,11 +1,9 @@
 FUNC max(a,b,){
-    DIM ma;
     IF(a>b;){
-        ma=a;
+        RETURN a;
     }ELSE{
-        ma=b;
+        RETURN b;
     };
-    RETURN ma;
 };
 FUNC min(a,b,){
     DIM mi;

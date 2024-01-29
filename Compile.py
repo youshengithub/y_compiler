@@ -225,8 +225,14 @@ class Compoment:
             pass
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
+            revise_code=code.split("\n")[:-1]
+            code=""
+            for i in range(len(revise_code)):
+                toend=len(revise_code)-i
+                revise_code[i]=revise_code[i].replace("END",str(toend))
+                code=code+revise_code[i]+"\n"
+            #需要把code里面的END全部替换掉！
             code+="MOV ESP $0:-6\n"
-            #code+="MOV $EBP:-3 $EAX\n" EAX不恢复！
             code+="MOV EBX $0:-3\n"
             code+="MOV EFG $0:-2\n"
             code+="MOV ETP $0:-1\n" #不用再跳转了！这里已经写好了参数了！ 注意到这里有一个坑按道理来说必须同时还原,
@@ -292,7 +298,8 @@ class Compoment:
             elif("$OPN$" in rule):
                 code="MOV EAX "+oplist[0]+"\n"
             else:
-                pass #啥也不返回
+                pass 
+            code+="JMP END\n"# 等到func来填充这个就可以了哦
             pass
         return code
     def handelP(self,rule,text,VarPos,prefix): #按道理这个也应该返回一个oplist
