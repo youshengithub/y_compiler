@@ -101,6 +101,7 @@ class Runner:
                     self.memory[op1]+=self.memory[op2]
                 else:
                     self.memory[op1]+=op2
+            
             elif(keywords[0]=="SUB"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):
@@ -119,6 +120,31 @@ class Runner:
                     self.memory[op1]/=self.memory[op2]
                 else:
                     self.memory[op1]/=op2
+            elif(keywords[0]=="AND"):
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[op1]=int(self.memory[op1]) & int(self.memory[op2])
+                else:
+                    self.memory[op1]=int(self.memory[op1]) & int(op2)
+            elif(keywords[0]=="OR"):
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[op1]=int(self.memory[op1]) | int(self.memory[op2])
+                else:
+                    self.memory[op1]=int(self.memory[op1]) | int(op2)
+            elif(keywords[0]=="XOR"):
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[op1]=int(self.memory[op1]) ^ int(self.memory[op2])
+                else:
+                    self.memory[op1]=int(self.memory[op1]) ^ int(op2)
+            elif(keywords[0]=="MOD"):
+                assert(flag1=="pos")
+                if(flag2=="pos"):
+                    self.memory[op1]=int(self.memory[op1]) % int(self.memory[op2])
+                else:
+                    self.memory[op1]=int(self.memory[op1]) % int(op2)
+                    
             elif(keywords[0]=="GREATER"):
                 if(flag1=="pos"):
                     if(flag2=="pos"):

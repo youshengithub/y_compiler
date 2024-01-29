@@ -42,9 +42,9 @@ class Compoment:
                 code=codelist[0]
                 code+="ADD EAX "+str(oplist[-1])+"\n"
             elif(rule=="$OP$+$OP$"):
-                code=codelist[0]
+                code=codelist[1]
                 code+="MOV EBX EAX\n"
-                code+=codelist[1]
+                code+=codelist[0]
                 code+="ADD EAX EBX\n"
             else:
                 assert(1==0)
@@ -78,9 +78,9 @@ class Compoment:
                 code=codelist[0]
                 code+="MUL EAX "+str(oplist[-1])+"\n"
             elif(rule=="$OP$*$OP$"):
-                code=codelist[0]
+                code=codelist[1]
                 code+="MOV EBX EAX\n"
-                code+=codelist[1]
+                code+=codelist[0]
                 code+="MUL EAX EBX\n"
             else:
                 assert(1==0)
@@ -103,6 +103,30 @@ class Compoment:
                 code+="DIV EAX EBX\n"
             else:
                 assert(1==0)
+        elif(self.name=="AND" or self.name=="XOR" or self.name=="OR" or self.name=="MOD"):
+            if(bool(re.match("\\$OPN\\$.+\\$OPN\\$", rule))):
+                code="MOV EAX "+str(oplist[0])+"\n"
+                code+=self.name+" EAX "+str(oplist[1])+"\n"
+            elif(bool(re.match("\\$OPN\\$.+\\$OP\\$", rule))):
+                code=codelist[0]
+                code+=self.name+" EAX "+str(oplist[0])+"\n"
+            elif(bool(re.match("\\$OP\\$.+\\$OPN\\$", rule))):
+                code=codelist[0]
+                code+=self.name+" EAX "+str(oplist[-1])+"\n"
+            elif(bool(re.match("\\$OP\\$.+\\$OP\\$", rule))):
+                code=codelist[0]
+                code+="MOV EBX EAX\n"
+                code+=codelist[1]
+                code+=self.name+" EAX EBX\n"
+            else:
+                assert(1==0)
+
+        elif(self.name=="NOT"): #处理单目运算符
+            pass
+        elif(self.name=="GETP"):
+            pass
+        elif(self.name=="SETP"):
+            pass
         elif(self.name=="EQUAL"):
             if(rule=="$VAR$=$OPN$;"):
                 code="MOV "+str(oplist[0]) +" "+str(oplist[1])+"\n"

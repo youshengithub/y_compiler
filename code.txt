@@ -25,12 +25,17 @@ FUNC hello(a1,b1,){
     }ELSE{
         DIM tp;
         tp=a1+1/2;
+        tp=tp+1*1;
+        tp=tp-1*1;
+        ans[1]=ans[1]&1;
         ans[0]=hello(tp,b1,);
         //PRINT(ans[0]);
     };
     RETURN ans[0]; 
 };
 DIM a;
+DIM b;
+DIM c;
 a=1;
 a=hello(a,10,);
 PRINT(a);
@@ -38,6 +43,10 @@ a=max(a,2,);
 PRINT(a);
 a=min(1,a,);
 PRINT(a);
+a=7;
+b=5;
+c=a%b;
+PRINT(c);
 //DIM a; //hello
 //DIM b;
 //DIM c;
