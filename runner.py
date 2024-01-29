@@ -49,8 +49,6 @@ class Runner:
                 return "pos",ans
             else:
                  return "pos",ans+self.memory[REGS["EBP"]]
-        elif ("@"  in text):
-            return "tag",text[1:]
         else:
             return "real",int(text)
             
@@ -58,8 +56,6 @@ class Runner:
         REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7}
         self.max_memory=100000
         self.memory=[0 for i in range(self.max_memory+len(REGS))]
-        self.tags={} #这里用来记录程序中分配的tag tag 和jmp tag tag用@来表示 TAG @a JMP @a
-        
         start_time = time.time()
         keywordss=[]
         for line in lines:
@@ -79,17 +75,11 @@ class Runner:
             if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
             if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)
             if(keywords[0]=="ALLOC"):
-                if(flag1=="tag"):
-                    if(op1 in self.tags):
-                        print("重定义符号") #接下来的即使jmp
-                    else:
-                        self.tags[op1]=ip+2
+                if(op1>=self.max_memory):
+                    print("栈溢出！")
+                    return 
                 else:
-                    if(op1>=self.max_memory):
-                        print("栈溢出！")
-                        return 
-                    else:
-                        self.memory[REGS["ESP"]]=op1+1
+                    self.memory[REGS["ESP"]]=op1+1
             elif(keywords[0]=="MOV"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):
@@ -218,8 +208,6 @@ class Runner:
                 if(self.memory[REGS["EFG"]]==True):
                     if(flag1=="real"):
                         self.memory[REGS["EIP"]]+=op1
-                    elif(flag1=="tag"):
-                        self.memory[REGS["EIP"]]=self.tags[op1] #这里必须得是绝对地址哦！ 
                     else:    
                         self.memory[REGS["EIP"]]+=self.memory[op1]
                     continue
@@ -227,16 +215,12 @@ class Runner:
                 if(self.memory[REGS["EFG"]]==False):
                     if(flag1=="real"):
                         self.memory[REGS["EIP"]]+=op1
-                    elif(flag1=="tag"):
-                        self.memory[REGS["EIP"]]=self.tags[op1] #这里必须得是绝对地址哦！ 
                     else:
                         self.memory[REGS["EIP"]]+=self.memory[op1]
                     continue    
             elif(keywords[0]=="JMP"):
                 if(flag1=="real"):
                     self.memory[REGS["EIP"]]+=op1
-                elif(flag1=="tag"):
-                        self.memory[REGS["EIP"]]=self.tags[op1] #这里必须得是绝对地址哦！ 
                 else:
                     self.memory[REGS["EIP"]]+=self.memory[op1]
                 continue
