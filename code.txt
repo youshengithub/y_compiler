@@ -39,19 +39,25 @@ DIM bb[100];
 DIM c;
 a=1;
 a=hello(a,10,);
-PRINT(a);
+//PRINT(a);
 a=max(a,2,);
-PRINT(a);
+//PRINT(a);
 a=min(1,a,);
-PRINT(a);
+//PRINT(a);
 a=7;
 b=5;
 c=a%b;
 c=!(a+b);
 c=&b[10];
 test(c,)
-PRINT(a);
-
+//PRINT(a);
+DIM d="hello,world!";
+c=0;
+WHILE(d[c]!=0;){
+    PRINT(d[c]);
+    c=c+1;
+};
+c=EAX;
 //DIM a; //hello
 //DIM b;
 //DIM c;

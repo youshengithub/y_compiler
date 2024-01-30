@@ -226,14 +226,14 @@ class Runner:
                 continue
             elif(keywords[0]=="OUT"):
                 if(flag1=="pos"):
-                    print("OUT: ",self.memory[op1])
+                    print(chr(self.memory[op1]),end="")
                 else:
-                    print("OUT: ",op1)
+                    print(chr(op1),end="")
             self.memory[REGS["EIP"]]+=1
         end_time = time.time()
         # 计算执行时间
         elapsed_time = end_time - start_time
-        print(f"虚拟机执行时间: {elapsed_time} 秒")
+        print(f"\n虚拟机执行时间: {elapsed_time} 秒")
     def Run_from_code(self,lines):
         print("********SYSTEM RUNNING********")
         self.RUN(lines)

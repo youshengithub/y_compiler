@@ -25,8 +25,23 @@ class Compoment:
             pass
         elif(self.name=="CONST"):
             pass
+        elif(self.name=="REGS"):
+            pass
         elif(self.name=="DIM"):
-            code="ALLOC "+str(oplist[0])+"\n"
+            if(rule=="DIM$VAR$;"):
+                code="ALLOC "+str(oplist[0])+"\n"
+            elif(rule=="DIM$VAR$=$STRING$;"):
+                pass #oplist[0]是var oplist[1]是strig
+                [base,length]=oplist[0].split(":")
+                string=oplist[1]
+                length=int(length)
+                if(length<len(string)):
+                    length=len(string)
+                revise_var=base+":"+str(length)
+                code="ALLOC "+str(revise_var)+"\n"   
+                for i in range(len(string)):
+                    code+="MOV "+base+":"+str(i)+" "+str(ord(string[i]))+ "\n"
+                code+="MOV "+base+":"+str(len(string))+ " 0\n"
             pass
         elif(self.name=="OP"):
             for i in codelist: code+=i 
@@ -351,6 +366,10 @@ class Compoment:
                         oplist.append(match.group(0))
                     elif(self.name=="FUNCNAME"): #需要有一个table 
                         oplist.append(match.group(0))
+                    elif(self.name=="STRING"): #需要有一个table 
+                        oplist.append(match.group(0)[1:-1])
+                    elif(self.name=="REGS"):
+                        oplist.append(match.group(0)) #直接把名称放进去
                 else:
                     
                     return False,text_c,VarPos,oplist,codelist,r_logs
@@ -492,9 +511,7 @@ class Compiler:
                     content+=line[0:pos]
                 else:
                     content+=line
-                    
         print("**********CODE**********")
-
         content_without_newlines = content.replace('\n', '').replace(' ', '').replace('\t', '')
         print(content,content_without_newlines)
         self.error=False

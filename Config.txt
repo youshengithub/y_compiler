@@ -1,6 +1,8 @@
-VAR:@(^[a-z]{1,55}[0-9]{0,255})(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@#:NO_START#
+REGS:@EAX@#@EBX@#@ESP@#@EBP@#@EIP@#@EFG@#@ETP@:NO_START#
+VAR:@(^[a-z]{1,55}[0-9]{0,255})(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@:NO_START#
 CONST:@^<-|>[0-9]{1,255}@#:NO_START#
-OPN:$VAR$#$CONST$#($OPN$):NO_START#
+STRING:@^"([^"]|(\\"))*"@:NO_START#
+OPN:$VAR$#$CONST$#$REGS$#($OPN$):NO_START#
 OP: $MUL$ # $DIV$ # $ADD$ # $SUB$ # $AND$ # $NOT$ # $OR$ # $XOR$ # $MOD$ # $GETP$ # $CALL$ #($OP$):NO_START#
 ADD:$<OP|OPN>$+$<OP|OPN>$:NO_START#
 SUB:$<OP|OPN>$-$<OP|OPN>$:NO_START#
@@ -13,7 +15,7 @@ XOR:$<OP|OPN>$^$<OP|OPN>$:NO_START#
 MOD:$<OP|OPN>$%$<OP|OPN>$:NO_START#
 GETP:&$VAR$:NO_START#
 SETP:*$<OP|OPN>$:NO_START#
-DIM:DIM$VAR$;#:
+DIM:DIM$VAR$;#DIM$VAR$=$STRING$;:
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$>;#:
 SENTENCE:$JUDGE$#$FOR$#$DO$#$WHILE$#$IF$#$EQUAL$#$PRINT$#$DIM$#$CALL$#$RETURN$:REPEAT#
 JUDGE:$OPN$==$OPN$;#$OPN$>$OPN$;#$OPN$<$OPN$;#$OPN$!=$OPN$;#$OPN$<=$OPN$;#$OPN$>=$OPN$;#($JUDGE$);$JUDGE$&&$JUDGE$;#$JUDGE$||$JUDGE$#:
