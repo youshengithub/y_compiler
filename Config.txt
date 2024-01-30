@@ -2,7 +2,7 @@ VAR:@(^[a-z]{1,55}[0-9]{0,255})(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@#@E
 CONST:@^<-|>[0-9]{1,255}@#:NO_START#
 STRING:@^"([^"]|(\\"))*"@:NO_START#
 OPN:$VAR$#$CONST$#($OPN$):NO_START#
-OP: $MUL$ # $DIV$ # $ADD$ # $SUB$ # $AND$ # $NOT$ # $OR$ # $XOR$ # $MOD$ # $GETP$ # $CALL$ #($OP$):NO_START#
+OP: $MUL$ # $DIV$ # $ADD$ # $SUB$ # $AND$ # $NOT$ # $OR$ # $XOR$ # $MOD$ # $GETP$ # $IN$ # $CALL$ #($OP$):NO_START#
 ADD:$<OP|OPN>$+$<OP|OPN>$:NO_START#
 SUB:$<OP|OPN>$-$<OP|OPN>$:NO_START#
 MUL:$<OP|OPN>$*$<OP|OPN>$:NO_START#
@@ -14,6 +14,7 @@ XOR:$<OP|OPN>$^$<OP|OPN>$:NO_START#
 MOD:$<OP|OPN>$%$<OP|OPN>$:NO_START#
 GETP:&$VAR$:NO_START#
 SETP:*$<OP|OPN>$:NO_START#
+IN:IN():NO_START#
 DIM:DIM$VAR$;#DIM$VAR$=$STRING$;:
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$>;#:
 SENTENCE:$JUDGE$#$FOR$#$DO$#$WHILE$#$IF$#$EQUAL$#$PRINT$#$DIM$#$CALL$#$RETURN$:REPEAT#

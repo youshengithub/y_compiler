@@ -238,6 +238,8 @@ class Compoment:
         elif(self.name=="PRINT"):
             code="OUT "+str(oplist[0])+"\n"
             pass
+        elif(self.name=="IN"):
+            code="IN EAX\n"
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
             revise_code=code.split("\n")[:-1]
@@ -339,6 +341,8 @@ class Compoment:
                 pattern=rule[1:next_index+1] 
                 match = re.search(pattern, text)
                 if match!=None :
+                    text=text[match.regs[0][1]:]  
+                    rule=rule[2+len(pattern):]  
                     #print("变量解析成功:",text,pattern)
                     if(self.name=="VAR"): #需要进行判断是什么词性
                         if(pattern.startswith("E")):
@@ -368,8 +372,7 @@ class Compoment:
                         oplist.append(match.group(0)[1:-1])
                     elif(self.name=="REGS"):
                         oplist.append(match.group(0)) #直接把名称放进去
-                    text=text[match.regs[0][1]:]  
-                    rule=rule[2+len(pattern):]  
+
                 else:
                     
                     return False,text_c,VarPos,oplist,codelist,r_logs

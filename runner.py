@@ -23,8 +23,8 @@
 #NOP
 #PUSH
 #POP
-
-import time,re
+#IN
+import time, msvcrt
 
 # 记录开始时间
 
@@ -226,9 +226,15 @@ class Runner:
                 continue
             elif(keywords[0]=="OUT"):
                 if(flag1=="pos"):
-                    print(chr(self.memory[op1]),end="")
+                    print(chr(int(self.memory[op1])),end="",flush=True)
                 else:
-                    print(chr(op1),end="")
+                    print(chr(int(op1)),end="",flush=True)
+            elif(keywords[0]=="IN"):
+                char = msvcrt.getch()
+                assert(flag1=="pos")
+                if(flag1=="pos"):
+                    self.memory[op1]=ord(char)
+
             self.memory[REGS["EIP"]]+=1
         end_time = time.time()
         # 计算执行时间

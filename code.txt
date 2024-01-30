@@ -57,6 +57,10 @@ WHILE(d[c]!=0;){
     PRINT(d[c]);
     c=c+1;
 };
+c=IN();
+PRINT(c);
+
+//EAX=1;
 //DIM a; //hello
 //DIM b;
 //DIM c;
