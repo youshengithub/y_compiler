@@ -1,7 +1,7 @@
 import re
 
 #除去里面的标志 ALLOC @ 换成NOP  JMP @设置指定位置
-class postprocesser:
+class Postprocesser:
     pass
     def process(self,text):
         tags={}

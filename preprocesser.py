@@ -1,4 +1,4 @@
-class preprocesser:
+class Preprocesser:
     pass
     def process_note(self,text):
         content=""

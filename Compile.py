@@ -1,8 +1,8 @@
 import re,itertools
 from runner import Runner
 # 打开文本文件
-from postprocesser import postprocesser
-from preprocesser import preprocesser
+from postprocesser import Postprocesser
+from preprocesser import Preprocesser
 
 class token:#token类
     pass
@@ -513,8 +513,8 @@ class Compiler:
         return self.ana(text,"",{"SUM":0})
 a=Compiler()
 b=Runner()
-c=postprocesser()
-d=preprocesser()
+c=Postprocesser()
+d=Preprocesser()
 a.construct_componets("Config.txt")
 with open("code.txt", 'r', encoding='utf-8') as file:
     content = file.read()
