@@ -340,28 +340,26 @@ class Compoment:
                 match = re.search(pattern, text)
                 if match!=None :
                     #print("变量解析成功:",text,pattern)
-                    text=text[match.regs[0][1]:]  
-                    rule=rule[2+len(pattern):]  
-                    
                     if(self.name=="VAR"): #需要进行判断是什么词性
-                        num_groups = len(match.groups())
-                        var_length="1"
-                        var_name=match.group(1)
-                        if(match.group(2)!=None):
-                            var_length=match.group(2)[1:-1] #这里是字符串
-                        if(var_name not in VarPos): 
-                            VarPos[var_name]=VarPos["SUM"]
-                            VarPos["SUM"]+=int(var_length)#这里必须成果！
-                        first="$"+str(VarPos[var_name])+":"
-                        
-                        if(var_length.isdigit()==True):
-                            if(match.group(2)==None):
-                                second="0" #a=1 就是a[0]=1
-                            else:
-                                second=var_length
+                        if(pattern.startswith("E")):
+                            oplist.append(match.group(0))
                         else:
-                            second="$"+str(VarPos[var_length])
-                        oplist.append(first+second) # #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！
+                            var_length="1"
+                            var_name=match.group(1)
+                            if(match.group(2)!=None):
+                                var_length=match.group(2)[1:-1] #这里是字符串
+                            if(var_name not in VarPos): 
+                                VarPos[var_name]=VarPos["SUM"]
+                                VarPos["SUM"]+=int(var_length)#这里必须成果！
+                            first="$"+str(VarPos[var_name])+":"
+                            if(var_length.isdigit()==True):
+                                if(match.group(2)==None):
+                                    second="0" #a=1 就是a[0]=1
+                                else:
+                                    second=var_length
+                            else:
+                                second="$"+str(VarPos[var_length])
+                            oplist.append(first+second) # #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
                     elif(self.name=="FUNCNAME"): #需要有一个table 
@@ -370,6 +368,8 @@ class Compoment:
                         oplist.append(match.group(0)[1:-1])
                     elif(self.name=="REGS"):
                         oplist.append(match.group(0)) #直接把名称放进去
+                    text=text[match.regs[0][1]:]  
+                    rule=rule[2+len(pattern):]  
                 else:
                     
                     return False,text_c,VarPos,oplist,codelist,r_logs
