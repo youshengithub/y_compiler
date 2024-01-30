@@ -1,0 +1,15 @@
+FUNC max(a,b,){
+    IF(a>b;){
+        RETURN a;
+    }ELSE{
+        RETURN b;
+    };
+};
+
+FUNC min(a,b,){
+    IF(a<b;){
+        RETURN b;
+    }ELSE{
+        RETURN a;
+    };
+};

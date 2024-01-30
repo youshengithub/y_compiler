@@ -2,6 +2,7 @@ import re,itertools
 from runner import Runner
 # 打开文本文件
 from postprocesser import postprocesser
+from preprocesser import preprocesser
 
 class token:#token类
     pass
@@ -505,26 +506,20 @@ class Compiler:
                     revised_configs+=self.revise_config(config)
                 print(name,revised_configs)
                 Compoment.Cs[name]=Compoment (name,revised_configs,"REPEAT" in attribute, "NO_START" in attribute)  
-    def Complie_file(self,file_path):
-        content=""
-        with open(file_path, 'r') as file:
-            for line in file:
-                pos=line.find("//")
-                if pos!=-1:
-                    content+=line[0:pos]
-                else:
-                    content+=line
-        print("**********CODE**********")
-        content_without_newlines = content.replace('\n', '').replace(' ', '').replace('\t', '')
-        print(content,content_without_newlines)
+    def Complie_file(self,text):
+
         self.error=False
         #做好预处理，先把函数的编译出来，然后在这里进行组装,
-        return self.ana(content_without_newlines,"",{"SUM":0})
+        return self.ana(text,"",{"SUM":0})
 a=Compiler()
 b=Runner()
 c=postprocesser()
+d=preprocesser()
 a.construct_componets("Config.txt")
-succ,code,varpos,logs=a.Complie_file("code.txt")
+with open("code.txt", 'r', encoding='utf-8') as file:
+    content = file.read()
+preprocessed_code=d.process(content)
+succ,code,varpos,logs=a.Complie_file(preprocessed_code)
 code=c.process(code)
 print(code)
 b.Run_from_code(code.split("\n"))
