@@ -64,13 +64,18 @@ class Runner:
                     line=line.replace(k,"$"+str(v))
             print(line)
             keywordss.append(line.split(" "))
+        print("**********execing*********")
         while(True):
             
             ip=self.memory[REGS["EIP"]]
             if(ip>=len(lines)):
                 break
             keywords=keywordss[ip]
-            
+            # for i in keywords:
+            #     print(i,end="")
+            #     print(" ",end="")
+            # print("")
+            #print(ip)
             #print("正在执行:",keywords)
             if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
             if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)
@@ -226,8 +231,10 @@ class Runner:
                 continue
             elif(keywords[0]=="OUT"):
                 if(flag1=="pos"):
+                    pass
                     print(chr(int(self.memory[op1])),end="",flush=True)
                 else:
+                    pass
                     print(chr(int(op1)),end="",flush=True)
             elif(keywords[0]=="IN"):
                 char = msvcrt.getch()

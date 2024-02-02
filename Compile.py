@@ -419,17 +419,18 @@ class Compoment:
             repeat=False
             for rule in self.configs:#通过语句构建,这个选择一种规则！
                 textc=text
-                if((text,self.name,rule) in Compoment.unmatch ): #使用缓存，避免重复解析
-                    if(Compoment.unmatch[(text,self.name,rule)]=="PROCESSING"):
+                key=(hash(text),self.name,rule) #使用hash节约内存
+                if(key in Compoment.unmatch ): #使用缓存，避免重复解析
+                    if(Compoment.unmatch[key]=="PROCESSING"):
                         #陷入重入
                         succ=False
                     else:
-                        succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[(text,self.name,rule)]
+                        succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[key]
                 else:
-                    Compoment.unmatch[(textc,self.name,rule)]="PROCESSING"
+                    Compoment.unmatch[key]="PROCESSING"
                     #print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
                     succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,prefix+"   ") #这里面没有传入代码 
-                    Compoment.unmatch[(textc,self.name,rule)]=(succ,text,VarPos,oplist,code_list,logs1)
+                    Compoment.unmatch[key]=(succ,text,VarPos,oplist,code_list,logs1)
                     #所以就算是解析成功也无法返回
                     #print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
                 if(succ):
