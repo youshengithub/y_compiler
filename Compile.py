@@ -522,7 +522,8 @@ with open("code.txt", 'r', encoding='utf-8') as file:
 preprocessed_code=d.process(content)
 succ,code,varpos,logs=a.Complie_file(preprocessed_code)
 code=c.process(code)
-print(code)
+with open("IR.txt", 'w', encoding='utf-8') as file:
+    file.write(code)
 b.Run_from_code(code.split("\n"))
 
 

@@ -4,7 +4,7 @@ FUNC hello(a1,b1,){
     //PRINT(a1);
     DIM ans[2];
     ans[0]=1;
-    IF(a1>1000;){
+    IF(a1>100000;){
         ans[0]=a1;
     }ELSE{
         DIM tp;
@@ -25,7 +25,9 @@ DIM b;
 DIM bb[100];
 DIM c;
 a=1;
-a=hello(a,10,);
+FOR(a=2;a<1000000;a=a+1;){//1 millon instructs per seconds
+    c=1;
+};
 //PRINT(a);
 a=max(a,2,);
 //PRINT(a);
@@ -44,8 +46,8 @@ WHILE(d[c]!=0;){
     PRINT(d[c]);
     c=c+1;
 };
-c=IN();
-PRINT(c);
+//c=IN();
+//PRINT(c);
 
 //EAX=1;
 //DIM a; //hello

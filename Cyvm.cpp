@@ -40,6 +40,7 @@ opcode turns2i(std::string&str){
     return string2int.find(str)->second;
 }
 enum type_op{POS,REAL};
+enum base_op{BASE,NOT_BASE};
 class Runner {
 private:
     std::vector<double> memory;
@@ -98,7 +99,7 @@ public:
 
     // 运行代码
     void RUN(const std::vector<std::string> &lines) {
-        auto start_time = std::chrono::high_resolution_clock::now();
+        
 
         std::vector<std::vector<std::string>> keywordss;
         std::vector<opcode> opcodelist;
@@ -113,15 +114,11 @@ public:
                 keywords.push_back(processed_line.substr(prev, pos - prev));
                 prev = pos + 1;
             }
-            
             keywords.push_back(processed_line.substr(prev));
             keywordss.push_back(keywords);
             opcodelist.push_back(turns2i(keywords[0]));
-            // for(auto& i: keywords){
-            //     std::cout<<i<<" ";
-            // }
-            // std::cout<<std::endl;
         }
+        auto start_time = std::chrono::high_resolution_clock::now();
         while (true) {
             //std::cout<<memory[REGS["EIP"]]<<std::endl;
             int ip = memory[REGS["EIP"]];
@@ -143,7 +140,7 @@ public:
             switch(n_opcode){
                 case ALLOC: {
                     if(op1>=max_memory){
-                        std::cout<<"Exceed the max limts"<<std::endl;
+                        std::cout<<"Exceed the max memory limts"<<std::endl;
                         exit(0);
                     }
                     memory[REGS["ESP"]]=op1+1;

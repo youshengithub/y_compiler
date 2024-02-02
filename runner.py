@@ -56,7 +56,7 @@ class Runner:
         REGS={"EAX":-1, "EBX":-2,"EBP":-3,"ESP":-4,"EIP":-5,"EFG":-6,"ETP":-7}
         self.max_memory=100000
         self.memory=[0 for i in range(self.max_memory+len(REGS))]
-        start_time = time.time()
+        
         keywordss=[]
         for line in lines:
             for k,v in REGS.items():
@@ -65,6 +65,7 @@ class Runner:
             print(line)
             keywordss.append(line.split(" "))
         print("**********execing*********")
+        start_time = time.time()
         while(True):
             
             ip=self.memory[REGS["EIP"]]
