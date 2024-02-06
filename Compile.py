@@ -230,6 +230,7 @@ class Compoment:
             code+="JMP -"+str((codelist[0]+codelist[1]).count("\n")+1)+"\n"
             pass
         elif(self.name=="FOR"):
+            #需要看一看有没有3
             code=codelist[0]+codelist[1]
             code+="JPIF "+str((codelist[3]+codelist[2]).count("\n")+2)+"\n"
             code+=codelist[3]+codelist[2]
@@ -453,6 +454,22 @@ class Compiler:
     #VARPos=环境
     def __init__(self) -> None:
         self.error=False
+    def ana2(self,text,codes,VarPos={},prefix=""):
+        state=[(text,codes,VarPos,prefix)]
+        ans_code=""
+        while len(state)!=0:
+            (n_text,n_codes,n_VarPos,n_prefix)=state[0]
+            state=state[1:]
+            if(n_text==""):
+                ans_code=n_codes
+                break
+            for name,sentence in Compoment.Cs.items():
+                if(sentence.no_start==True): continue
+                succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(n_text,n_VarPos,"",n_prefix+"   ")
+                if(succ==True):
+                    state.append((textc,n_codes+code,VarPos,"   "+prefix))
+                    break
+        return ans_code
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""
         if(text==""):
@@ -511,7 +528,7 @@ class Compiler:
 
         self.error=False
         #做好预处理，先把函数的编译出来，然后在这里进行组装,
-        return self.ana(text,"",{"SUM":0})
+        return self.ana2(text,"",{"SUM":0})
 a=Compiler()
 b=Runner()
 c=Postprocesser()
@@ -520,7 +537,7 @@ a.construct_componets("Config.txt")
 with open("code.txt", 'r', encoding='utf-8') as file:
     content = file.read()
 preprocessed_code=d.process(content)
-succ,code,varpos,logs=a.Complie_file(preprocessed_code)
+code=a.Complie_file(preprocessed_code)
 code=c.process(code)
 with open("IR.txt", 'w', encoding='utf-8') as file:
     file.write(code)

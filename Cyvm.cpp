@@ -45,7 +45,7 @@ enum type_op{POS,REAL};
 enum num_type{BASE_INDIRCT,BASE_DIRCT,NOBASE_INDIRCT,NOBASE_DIRCT,DIRECT};
 class Runner {
 private:
-    std::vector<double> memory;
+    double* memory;
     std::unordered_map<std::string, int> REGS;
     const int max_memory = 100000;
 
@@ -57,9 +57,15 @@ public:
             {"EIP", -5}, {"EFG", -6}, {"ETP", -7}
         };
         // 初始化内存
-        memory.resize(max_memory + REGS.size(), 0);
+        int regs_num=REGS.size();
+        memory=new double[max_memory+regs_num];
+        memory=memory+regs_num;
+        //memory.resize(max_memory + REGS.size(), 0);
     }
-
+    ~Runner() {
+        memory-=REGS.size();
+        delete memory;
+    }
     // 计算位置函数
      std::pair<type_op, int> calc_pos(const std::string &text,std::vector<int>&opnum) {
         if (text.find("$") != std::string::npos) {
