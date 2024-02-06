@@ -36,11 +36,13 @@ std::map<std::string,opcode> string2int{
 {"OUT",opcode::OUT},
 {"IN",opcode::IN}
 };
+enum reg_id{EAX=-1,EBX=-2,EBP=-3,ESP=-4,EIP=-5,EFG=-6,ETP=-7};
 opcode turns2i(std::string&str){
     return string2int.find(str)->second;
 }
 enum type_op{POS,REAL};
-enum base_op{BASE,NOT_BASE};
+//           EBP+M[a+M[b]] EBP+M[a]+b M[a+M[b]]      M[a]+b        a
+enum num_type{BASE_INDIRCT,BASE_DIRCT,NOBASE_INDIRCT,NOBASE_DIRCT,DIRECT};
 class Runner {
 private:
     std::vector<double> memory;
@@ -59,7 +61,7 @@ public:
     }
 
     // 计算位置函数
-    std::pair<type_op, int> calc_pos(const std::string &text) {
+     std::pair<type_op, int> calc_pos(const std::string &text,std::vector<int>&opnum) {
         if (text.find("$") != std::string::npos) {
             int ans = 0;
             size_t colon_pos = text.find(":");
@@ -67,21 +69,29 @@ public:
             if (colon_pos != std::string::npos) {
                 std::string second_part = text.substr(colon_pos + 1);
                 if (second_part[0] == '$') {
+                    opnum.push_back(num_type::BASE_INDIRCT);
+                    opnum.push_back(ans);
+                    opnum.push_back(std::stoi(second_part.substr(1)));
                     ans += memory[std::stoi(second_part.substr(1))];
                 } else {
+                    opnum.push_back(num_type::BASE_DIRCT);
+                    opnum.push_back(ans);
+                    opnum.push_back(std::stoi(second_part));
                     ans += std::stoi(second_part);
                 }
-            } else {
+                return {type_op::POS, ans + memory[reg_id::EBP]};
+            } else { //只找到了一段
                 if (ans < 0) {
+                    opnum.push_back(num_type::NOBASE_DIRCT);
+                    opnum.push_back(ans);
+                    opnum.push_back(0);
                     return {type_op::POS, ans};
                 }
-            }
-            if (text.find("%") != std::string::npos) {
-                return {type_op::POS, ans};
-            } else {
-                return {type_op::POS, ans + memory[REGS["EBP"]]};
+                assert(1==0);
             }
         } else {
+            opnum.push_back(num_type::DIRECT);
+            opnum.push_back(std::stoi(text));
             return {type_op::REAL, std::stoi(text)};
         }
     }
@@ -96,13 +106,33 @@ public:
             }
         }
     }
-
+    inline void from_info_get_flag(std::vector<int>&info_num,int &op1,type_op&flag1){
+                flag1=POS;
+                switch (info_num[0]){
+                    case num_type::DIRECT:
+                        flag1=REAL;
+                        op1=info_num[1];
+                        break;
+                    case num_type::BASE_DIRCT:
+                        op1=info_num[1]+info_num[2]+memory[EBP];
+                        break;
+                    case num_type::BASE_INDIRCT:
+                        op1=info_num[1]+memory[info_num[2]]+memory[EBP];
+                        break;
+                    case num_type::NOBASE_DIRCT:
+                        op1=info_num[1]+info_num[2];
+                        break;
+                    case num_type::NOBASE_INDIRCT:
+                        op1=info_num[1]+memory[info_num[2]];
+                        break;
+                }   
+    }
     // 运行代码
     void RUN(const std::vector<std::string> &lines) {
-        
-
         std::vector<std::vector<std::string>> keywordss;
         std::vector<opcode> opcodelist;
+        std::vector<std::vector<std::vector<int>> > opnum_list;//先传进来
+
         for (const auto &line : lines) {
             //std::cout<<line<<" -------> ";
             std::string processed_line = line;
@@ -119,22 +149,36 @@ public:
             opcodelist.push_back(turns2i(keywords[0]));
         }
         auto start_time = std::chrono::high_resolution_clock::now();
+        long long int instructs_times=0;
+        for(auto &i:keywordss){
+            std::vector<std::vector<int>>tpans;
+            if(i.size()>=2){
+            std::vector<int>temp;
+            auto ans=calc_pos(i[1],temp);
+            tpans.push_back(temp);
+            }
+            if(i.size()>=3){
+            std::vector<int>temp;
+            auto ans=calc_pos(i[2],temp);
+            tpans.push_back(temp);
+            }
+            opnum_list.push_back(tpans);
+        }
         while (true) {
-            //std::cout<<memory[REGS["EIP"]]<<std::endl;
-            int ip = memory[REGS["EIP"]];
+            instructs_times++;
+            //std::cout<<memory[reg_id::EIP]<<std::endl;
+            int ip = memory[reg_id::EIP];
             if (ip >= lines.size()) {
                 break;
             }
             const auto &keywords = keywordss[ip];
-            // for(auto &i :keywords) std::cout<<i<<" ";
-            // std::cout<<std::endl;
-            //std::cout<<ip<<std::endl;
-            std::pair<type_op, int> k1, k2;
-            if (keywords.size() >= 2) k1 = calc_pos(keywords[1]);
-            if (keywords.size() >= 3) k2 = calc_pos(keywords[2]);
-            int op1 = k1.second, op2 = k2.second;
-            type_op& flag1=k1.first;
-            type_op& flag2=k2.first;
+            type_op flag1=POS;
+            type_op flag2=POS;
+            int op1 = 0, op2 = 0;
+            auto V_num=opnum_list[ip];
+            if(V_num.size()>=1) from_info_get_flag(V_num[0],op1,flag1);
+            if(V_num.size()>=2) from_info_get_flag(V_num[1],op2,flag2);
+
             // 主指令处理逻辑
             auto n_opcode=opcodelist[ip];
             switch(n_opcode){
@@ -143,7 +187,7 @@ public:
                         std::cout<<"Exceed the max memory limts"<<std::endl;
                         exit(0);
                     }
-                    memory[REGS["ESP"]]=op1+1;
+                    memory[reg_id::ESP]=op1+1;
                     // ...
                     }break; 
                 case MOV:
@@ -218,9 +262,9 @@ public:
                 case  MOD:
                     assert(flag1 == type_op::POS);
                     if (flag2 == type_op::POS) {
-                        memory[op1] =int(memory[op1])% int(memory[op2]);
+                        memory[op1] =int(memory[op1]) % int(memory[op2]);
                     } else {
-                        memory[op1] = int(memory[op1]) %int(op2);
+                        memory[op1] = int(memory[op1])%int(op2);
                     }
                     break;                
 
@@ -251,17 +295,17 @@ public:
 
                 case PUSH:
                     if (flag1 == type_op::POS) {
-                        memory[REGS["ESP"]] = int(memory[op1]);
+                        memory[reg_id::ESP] = int(memory[op1]);
                     } else {
-                        memory[REGS["ESP"]] = int(op1);
+                        memory[reg_id::ESP] = int(op1);
                     }
-                    memory[REGS["ESP"]]+=1;
+                    memory[reg_id::ESP]+=1;
                     break;                
 
                 case POP:
                     assert(flag1 == type_op::POS);
-                    memory[REGS["ESP"]]-=1;
-                    memory[op1] = memory[REGS["ESP"]];
+                    memory[reg_id::ESP]-=1;
+                    memory[op1] = memory[reg_id::ESP];
                     break;                
                 
 
@@ -269,68 +313,68 @@ public:
                     if(flag1== type_op::POS){
 
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = memory[op1]>memory[op2];
+                            memory[reg_id::EFG] = memory[op1]>memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = memory[op1]>op2;
+                            memory[reg_id::EFG] = memory[op1]>op2;
                         }
                     }else{
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = op1>memory[op2];
+                            memory[reg_id::EFG] = op1>memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = op1>op2;
+                            memory[reg_id::EFG] = op1>op2;
                         }
 
                     }
-                    memory[REGS["EFG"]]=!memory[REGS["EFG"]];
+                    memory[reg_id::EFG]=!memory[reg_id::EFG];
                     break;               
 
                 case EQUAL:
                     if(flag1== type_op::POS){
 
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = memory[op1]==memory[op2];
+                            memory[reg_id::EFG] = memory[op1]==memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = memory[op1]==op2;
+                            memory[reg_id::EFG] = memory[op1]==op2;
                         }
                     }else{
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = op1==memory[op2];
+                            memory[reg_id::EFG] = op1==memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = op1==op2;
+                            memory[reg_id::EFG] = op1==op2;
                         }
 
                     }
-                    memory[REGS["EFG"]]=!memory[REGS["EFG"]];
+                    memory[reg_id::EFG]=!memory[reg_id::EFG];
                     break;                
 
                 case LESS:
                     if(flag1== type_op::POS){
 
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = memory[op1]<memory[op2];
+                            memory[reg_id::EFG] = memory[op1]<memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = memory[op1]<op2;
+                            memory[reg_id::EFG] = memory[op1]<op2;
                         }
                     }else{
                         if (flag2 == type_op::POS) {
-                            memory[REGS["EFG"]] = op1<memory[op2];
+                            memory[reg_id::EFG] = op1<memory[op2];
                         } else {
-                            memory[REGS["EFG"]] = op1<op2;
+                            memory[reg_id::EFG] = op1<op2;
                         }
 
                     }
-                    memory[REGS["EFG"]]=!memory[REGS["EFG"]];
+                    memory[reg_id::EFG]=!memory[reg_id::EFG];
                     break;                
 
                 case RF:
-                    memory[REGS["EFG"]]=!memory[REGS["EFG"]];
+                    memory[reg_id::EFG]=!memory[reg_id::EFG];
                     break;
                 case JPIF:
-                    if(memory[REGS["EFG"]]!=0){
+                    if(memory[reg_id::EFG]!=0){
                         if (flag1 == type_op::REAL) {
-                            memory[REGS["EIP"]] += op1;
+                            memory[reg_id::EIP] += op1;
                         } else {
-                            memory[REGS["EIP"]] += memory[op1];
+                            memory[reg_id::EIP] += memory[op1];
                         }
                         continue; // 需要立即跳到新位置，无需递增 EIP
                     }
@@ -338,11 +382,11 @@ public:
                 
 
                 case JPNIF:
-                    if(memory[REGS["EFG"]]==false){
+                    if(memory[reg_id::EFG]==false){
                         if (flag1 == type_op::REAL) {
-                            memory[REGS["EIP"]] += op1;
+                            memory[reg_id::EIP] += op1;
                         } else {
-                            memory[REGS["EIP"]] += memory[op1];
+                            memory[reg_id::EIP] += memory[op1];
                         }
                         continue; // 需要立即跳到新位置，无需递增 EIP
                     }
@@ -350,9 +394,9 @@ public:
 
                 case JMP:
                     if (flag1 == type_op::REAL) {
-                        memory[REGS["EIP"]] += op1;
+                        memory[reg_id::EIP] += op1;
                     } else {
-                        memory[REGS["EIP"]] += memory[op1];
+                        memory[reg_id::EIP] += memory[op1];
                     }
                     continue; // 需要立即跳到新位置，无需递增 EIP
 
@@ -370,13 +414,13 @@ public:
                     memory[op1] = static_cast<int>(ch);
                     break; 
             }
-                
-            memory[REGS["EIP"]] += 1; // 递增指令指针
+            //if(instructs_times==7000242) break;
+            memory[reg_id::EIP] += 1; // 递增指令指针
         }
 
         auto end_time = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed_time = end_time - start_time;
-        std::cout << "\nVirtual Meachine Runing time: " << elapsed_time.count() << " seconds" << std::endl;
+        std::cout <<"\nInstructs Calls:"<<instructs_times<< "\nVirtual Meachine Runing time: " << elapsed_time.count() << " seconds" << std::endl;
     }
 
     // 从代码字符串运行

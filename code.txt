@@ -25,7 +25,7 @@ DIM b;
 DIM bb[100];
 DIM c;
 a=1;
-FOR(a=2;a<1000000;a=a+1;){//1 millon instructs per seconds
+FOR(a=2;a<33000000;a=a+1;){//1 millon instructs per seconds
     c=1;
 };
 //PRINT(a);

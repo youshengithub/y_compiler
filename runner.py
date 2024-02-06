@@ -25,7 +25,7 @@
 #POP
 #IN
 import time, msvcrt
-
+import cProfile
 # 记录开始时间
 
 class Runner:
