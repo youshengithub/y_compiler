@@ -320,6 +320,7 @@ class Compoment:
                 pass 
             code+="JMP END\n"# 等到func来填充这个就可以了哦
             pass
+        #code="NOP \/\/"+rule+"\n"+code
         return code
     def handelP(self,rule,text,VarPos,prefix): #按道理这个也应该返回一个oplist
         #print("HandleP: Rule:",rule," Text: ",text)
@@ -441,6 +442,9 @@ class Compoment:
                     #在这里构建code!
                     #print(self.name,rule,oplist,code_list,VarPos)
                     compiled_code=self.Complie(rule,oplist,code_list,VarPos) 
+                    first_enter=compiled_code.find("\n")
+                    if(first_enter!=-1):
+                        compiled_code=compiled_code[:first_enter]+"//"+textc[:len(textc)-len(text)]+compiled_code[first_enter:]
                     r_code+=compiled_code #+" Rule: "+rule
                     this_log="***************Text*************** \n"+textc[:len(textc)-len(text)]+"\n***************Code***************\n"+compiled_code
                     logs=logs1+this_log
@@ -459,6 +463,7 @@ class Compiler:
         ans_code=""
         while len(state)!=0:
             (n_text,n_codes,n_VarPos,n_prefix)=state[0]
+            print("len:",len(n_text))
             state=state[1:]
             if(n_text==""):
                 ans_code=n_codes
@@ -538,6 +543,7 @@ with open("code.txt", 'r', encoding='utf-8') as file:
     content = file.read()
 preprocessed_code=d.process(content)
 code=a.Complie_file(preprocessed_code)
+print(code)
 code=c.process(code)
 with open("IR.txt", 'w', encoding='utf-8') as file:
     file.write(code)

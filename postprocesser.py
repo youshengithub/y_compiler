@@ -3,7 +3,18 @@ import re
 #除去里面的标志 ALLOC @ 换成NOP  JMP @设置指定位置
 class Postprocesser:
     pass
+    def process_note(self,text):
+        content=""
+        file=text.split("\n")
+        for line in file:
+            pos=line.find("//")
+            if pos!=-1:
+                content+=line[0:pos]+"\n"
+            else:
+                content+=line+"\n"
+        return content
     def process(self,text):
+        text=self.process_note(text)
         tags={}
         revise_code=text.split("\n")[:-1]
         code=""
