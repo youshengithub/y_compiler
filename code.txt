@@ -46,8 +46,8 @@ c=0;
 while(d[c]!=0){
     print(d[c]);
     c=c+1;
-};
-//c=IN();
+}
+//c=in();
 //print(c);
 
 //EAX=1;
