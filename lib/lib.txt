@@ -1,15 +1,14 @@
 FUNC max(a,b,){
-    IF(a>b;){
-        RETURN a;
-    }ELSE{
-        RETURN b;
-    };
-};
-
+    if(a>b){
+        return a;
+    }else{
+        return b;
+    }
+}
 FUNC min(a,b,){
-    IF(a<b;){
-        RETURN b;
-    }ELSE{
-        RETURN a;
-    };
-};
+    if(a<b){
+        return b;
+    }else{
+        return a;
+    }
+}
