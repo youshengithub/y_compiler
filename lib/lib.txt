@@ -1,11 +1,11 @@
-FUNC max(a,b,){
+func max(a,b,){
     if(a>b){
         return a;
     }else{
         return b;
     }
 }
-FUNC min(a,b,){
+func min(a,b,){
     if(a<b){
         return b;
     }else{

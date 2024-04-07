@@ -27,6 +27,6 @@ PRINT:print($OPN$);#:
 CALL:$FUNCNAME$(<$ARG$|>):
 ARG:$OPN$#,#:NO_START#REPEAT#
 PAR:$VAR$,#:NO_START#REPEAT#
-FUNCNAME:@(^[a-z]{1}[A-Za-z0-9_-]{0,255})@#:NO_START#
-FUNC:FUNC$FUNCNAME$(<$PAR$|>){<$SENTENCE$|>}:
+FUNCNAME:@(^(?!func)[a-z]{1}[A-Za-z0-9_-]{0,255})@#:NO_START#
+FUNC:func$FUNCNAME$(<$PAR$|>){<$SENTENCE$|>}:
 RETURN:return<$OP$|$OPN$|>;:
