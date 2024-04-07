@@ -408,8 +408,7 @@ class Compoment:
     def Rrcognize(self,text,VarPos,toprule="",prefix=""):
         #如果是repeat的话 还需要重复！
         #print("Rrcognize: name: ",self.name, "Text: ",text)
-        if(self.name=="EQUAL"):
-            debug=1
+
         flag=False
         code=""
         repeat=True
@@ -464,17 +463,21 @@ class Compiler:
         ans_code=""
         while len(state)!=0:
             (n_text,n_codes,n_VarPos,n_prefix)=state[0]
-            print("len:",len(n_text))
+            print(f"编译进度:{100-100*len(n_text)/len(text):.2f}%")
             state=state[1:]
             if(n_text==""):
                 ans_code=n_codes
                 break
+            single_succ=False
             for name,sentence in Compoment.Cs.items():
                 if(sentence.no_start==True): continue
                 succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(n_text,n_VarPos,"",n_prefix+"   ")
                 if(succ==True):
                     state.append((textc,n_codes+code,VarPos,"   "+prefix))
+                    single_succ=True
                     break
+            if(single_succ==False):
+                print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
         return ans_code
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""
@@ -498,9 +501,10 @@ class Compiler:
                     flag=True
                     break #只能有一种 不能再加了！
                 else:
+
                     if(self.error==False):
                         self.error=True
-                        print("编译错误！,当前编译位置:",textc,"\nlog\n",logs2)
+                        print("编译错误！,当前编译位置:",textc,"\nlog\n",logs2)                        
                     #return False,codes,VarPos,r_logs #这句话不知道该不该加上去！！！！
         return flag,codes,VarPos,r_logs
     def revise_config(self,original_str):
