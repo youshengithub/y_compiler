@@ -40,13 +40,14 @@ c=a%b;
 c=!(a+b);
 c=&b[10];
 testok(c,)
-//print(a);
-dim d="hello,world!";
+dim d[10]="hello,world!";
 c=0;
 while(d[c]!=0){
+    //print(55);
     print(d[c]);
     c=c+1;
 }
+
 //c=in();
 //print(c);
 
