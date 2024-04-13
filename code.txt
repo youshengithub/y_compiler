@@ -22,11 +22,11 @@ func test(p1,){
 }
 dim a;
 dim b;
-dim bb[100];
+dim bb[1];
 dim c;
 dim Y_c;
 a=1;
-for(a=2;a<33333;a=a+1;){//1 millon instructs per seconds
+for(a=2;a<33333;a=a+1;){//3 millon instructs per seconds
     c=1;
 }
 //print(a);
@@ -43,57 +43,25 @@ testok(c,)
 dim d[10]="hello,world!!!";
 c=0;
 while(d[c]!=0){
-    //print(55);
     print(d[c]);
     c=c+1;
 }
-
-//c=in();
-//print(c);
-
-//EAX=1;
-//dim a; //hello
-//dim b;
-//dim c;
-//dim d;
-//b=0;
-//c=0;
-//a=(1+(1+(1/2)/2))/2;
-//a=a+1;
-//FOR(a=1; a<10; a=a+1;){
-//    FOR(b=1; b<10; b=b+1;){c=c+1;};
-//    
-//    };
-//c=0;
-//while(c<10;){
-//    c=c+1;
-//};
-//DO{
-//    c=c+1;
-//}while(c<10;);
-//
-//IF(c>0;){c=c+1;}ELSE{c=c-1;};
-//print(c);
-//dim a[10]; //hello
-//dim b;
-//dim c;
-//dim d;
-//a[0]=1000;
-//b=0;
-//d=1;
-//
-//FOR(c=0;c<10;c=c+1;){
-//    c=c+1;
-//    c=c-1;
-//    IF(d==1;){
-//        b=b+1/((2*c)+1);
-//        d=0;
-//    }ELSE{
-//        b=b-1/((2*c)+1);
-//        d=1;        
-//    };
-//    a[c]=c;
-//    print(a[c]);
-//};
-//b=b*4;
-//print(b);
+print_int(987,)
+for(a=2;a<1;a=a+1;){
+    dim ok;
+    ok=1;
+    for(b=a;b<a;b=b+1;){
+        dim ans;
+        ans=a%b;
+        if(ans==0){
+            ok=0;
+        }else{
+            ok=1;
+        }
+    }
+    if(ok==1){
+        print_int(a,)
+    }else{
+        ok=1;
+    }
+}

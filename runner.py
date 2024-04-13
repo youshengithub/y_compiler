@@ -38,7 +38,7 @@ class Runner:
             ans=int(texts[0][1:])
             if(len(texts)==2):
                 if(texts[1].startswith("$")):
-                    ans+=int(self.memory[int(texts[1][1:])])
+                    ans+=int(self.memory[int(self.memory[REGS["EBP"]])+int(texts[1][1:])])
                 else:
                     ans+=int(texts[1])
             else:
@@ -78,6 +78,7 @@ class Runner:
             # print("")
             #print(ip)
             #print("正在执行:",keywords)
+
             if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
             if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)
             if(keywords[0]=="ALLOC"):

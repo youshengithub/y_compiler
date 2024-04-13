@@ -123,7 +123,7 @@ public:
                         op1=info_num[1]+info_num[2]+memory[EBP];
                         break;
                     case num_type::BASE_INDIRCT:
-                        op1=info_num[1]+memory[info_num[2]]+memory[EBP];
+                        op1=info_num[1]+memory[info_num[2]+int(memory[EBP])];
                         break;
                     case num_type::NOBASE_DIRCT:
                         op1=info_num[1]+info_num[2];
