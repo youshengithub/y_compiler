@@ -115,21 +115,21 @@ public:
     inline void from_info_get_flag(std::vector<int>&info_num,int &op1,type_op&flag1){
                 flag1=POS;
                 switch (info_num[0]){
-                    case num_type::DIRECT:
+                    case num_type::DIRECT: // 1
                         flag1=REAL;
                         op1=info_num[1];
                         break;
-                    case num_type::BASE_DIRCT:
-                        op1=info_num[1]+info_num[2]+memory[EBP];
+                    case num_type::BASE_DIRCT: //$1:1
+                        op1=info_num[1]+info_num[2]+int(memory[EBP]);
                         break;
-                    case num_type::BASE_INDIRCT:
+                    case num_type::BASE_INDIRCT: //%1:$1 or $-1:$1
                         op1=info_num[1]+memory[info_num[2]+int(memory[EBP])];
                         break;
-                    case num_type::NOBASE_DIRCT:
+                    case num_type::NOBASE_DIRCT://%1:1 or $-1:1
                         op1=info_num[1]+info_num[2];
                         break;
-                    case num_type::NOBASE_INDIRCT:
-                        op1=info_num[1]+memory[info_num[2]];
+                    case num_type::NOBASE_INDIRCT://$1:$1 
+                        op1=info_num[1]+memory[info_num[2]+int(memory[EBP])]+int(memory[EBP]);
                         break;
                 }   
     }
