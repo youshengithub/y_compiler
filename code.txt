@@ -46,20 +46,22 @@ while(d[c]!=0){
     print(d[c]);
     c=c+1;
 }
-print_int(987,)
-for(a=2;a<1;a=a+1;){
+
+for(a=2;a<1000000;a=a+1;){
     dim ok;
     ok=1;
-    for(b=a;b<a;b=b+1;){
+    for(b=2;b<a;b=b+1;){
         dim ans;
         ans=a%b;
         if(ans==0){
             ok=0;
+            b=a;
         }else{
             ok=1;
         }
     }
     if(ok==1){
+        ok=1;
         print_int(a,)
     }else{
         ok=1;

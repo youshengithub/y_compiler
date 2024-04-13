@@ -13,18 +13,28 @@ func min(a,b,){
     }
 }
 func print_int(a,){
-    dim res[30];
-    dim length;
-    length=0;
-    while(a!=0){
-        res[length]=(a%10)+48;
-        length=length+1;
-        a=a/10;
-        a=a%210000000;
-    }
-    while(length>-1){
-        print(res[length]);
-        length=length-1;
+    if(a==0){
+        print(48);
+    }else{
+        if(a<0){
+            print(45);
+            a=a*(-1);
+        }else{
+            a=a*1;
+        }
+        dim res[30];
+        dim length;
+        length=0;
+        while(a!=0){
+            res[length]=(a%10)+48;
+            length=length+1;
+            a=a/10;
+            a=a%210000000;
+        }
+        while(length>-1){
+            print(res[length]);
+            length=length-1;
+        }
     }
     print(10);
 }
