@@ -29,9 +29,9 @@ class Compoment:
         elif(self.name=="REGS"):
             pass
         elif(self.name=="DIM"):
-            if(rule=="dim$VAR$;"):
+            if(rule=="double$VAR$;"):
                 code="ALLOC "+str(oplist[0])+"\n"
-            elif(rule=="dim$VAR$=$STRING$;"):
+            elif(rule=="double$VAR$=$STRING$;"):
                 pass #oplist[0]是var oplist[1]是strig
                 [base,length]=oplist[0].split(":")
                 string=oplist[1]

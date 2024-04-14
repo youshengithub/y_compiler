@@ -22,8 +22,8 @@ func print_int(a,){
         }else{
             a=a*1;
         }
-        dim res[30];
-        dim length;
+        double res[30];
+        double length;
         length=0;
         while(a!=0){
             res[length]=(a%10)+48;

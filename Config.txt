@@ -1,4 +1,7 @@
-VAR:@(^(?!dim)(?!in)(?!if)(?!do)(?!while)(?!for)(?!print)(?!else)(?!func)(?!return)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@# @EAX@# @EBX@# @ESP@# @EBP@# @EIP@# @EFG@# @ETP@:NO_START# 
+TYPENAME:@(^<[A-Za-z0-9_]{0,255}^$)@# :NO_START# 
+TYPE:double # int # $TYPENAME$:NO_START# 
+STRUCTURE:struct$VAR${$DIM$} :NO_START# 
+VAR:@(^(?!double)(?!in)(?!if)(?!do)(?!while)(?!for)(?!print)(?!else)(?!func)(?!return)(?!struct)(?!int)(?!double)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@# @EAX@# @EBX@# @ESP@# @EBP@# @EIP@# @EFG@# @ETP@:NO_START# 
 CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
 STRING:@^"([^"]|(\\"))*"@:NO_START# 
 OPN:$VAR$# $CONST$# ($OPN$):NO_START# 
@@ -15,7 +18,7 @@ MOD:$<OP|OPN>$%$<OP|OPN>$:NO_START#
 GETP:&$VAR$:NO_START# 
 SETP:*$<OP|OPN>$:NO_START# 
 IN:in():NO_START# 
-DIM:dim$VAR$;# dim$VAR$=$STRING$;:
+DIM:$TYPE$$VAR$;# $TYPE$$VAR$=$STRING$;:REPEAT# 
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$>;# :
 SENTENCE:$JUDGE$# $FOR$# $DO$# $WHILE$# $IF$# $EQUAL$# $PRINT$# $DIM$# $CALL$# $RETURN$:REPEAT# 
 JUDGE:$OPN$==$OPN$# $OPN$>$OPN$# $OPN$<$OPN$# $OPN$!=$OPN$# $OPN$<=$OPN$# $OPN$>=$OPN$# ($JUDGE$)# $JUDGE$&&$JUDGE$# $JUDGE$||$JUDGE$# :
