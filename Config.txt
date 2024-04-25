@@ -21,7 +21,7 @@ SETP:*$<OP|OPN>$:NO_START#
 IN:in():NO_START# 
 DIM:$TYPE$->$VAR$;# $TYPE$->$VAR$=$STRING$;:REPEAT# 
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$>;# :
-SENTENCE:$JUDGE$# $FOR$# $DO$# $WHILE$# $IF$# $EQUAL$# $PRINT$# $DIM$# $CALL$# $RETURN$:REPEAT# 
+SENTENCE:$JUDGE$# $FOR$# $DO$# $WHILE$# $IF$# $EQUAL$# $PRINT$# $DIM$# $CALL$ # $RETURN$ # $FUNC$:REPEAT# 
 AREA:{$SENTENCE$}:# 
 JUDGE:$OPN$==$OPN$# $OPN$>$OPN$# $OPN$<$OPN$# $OPN$!=$OPN$# $OPN$<=$OPN$# $OPN$>=$OPN$# ($JUDGE$)# $JUDGE$&&$JUDGE$# $JUDGE$||$JUDGE$# :
 IF:if($JUDGE$)$AREA$<else$AREA$|># :
@@ -33,4 +33,4 @@ CALL:$TOKEN$(<$ARG$|>):
 ARG:$OPN$# ,# :NO_START# REPEAT# 
 PAR:$VAR$,# :NO_START# REPEAT# 
 FUNC:func$TOKEN$(<$PAR$|>)$AREA$:
-RETURN:return<$OP$|$OPN$|>;:
+RETURN:return<$OP$|$OPN$|>;:NO_START# 
