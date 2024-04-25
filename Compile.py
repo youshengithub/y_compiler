@@ -18,18 +18,25 @@ class Compoment:
         self.no_start=no_start
     def Complie(self,rule,oplist,codelist,VarPos,area_tree):
         code=""
-        return code #先把解析做好
+        #return code
         if(self.name=="VAR"): 
+            #判断token的类型
             #需要对VAR做出修正
+            #在这里找到正确的位置 判断是不是DIM里面的#反正在这里必须进行替换！！！
+            if(area_tree.find_token(oplist)):
+                
+                pass
+        elif(self.name=="TOKEN"): #注意到有些token是
+            #看一看到底是哪一个token  
             pass
         elif(self.name=="CONST"):
             pass
         elif(self.name=="REGS"):
             pass
         elif(self.name=="DIM"): #这里要产生巨变！
-            if(rule=="$TYPE$$VAR$;"):
-                code="ALLOC "+str(oplist[0])+"\n"
-            elif(rule=="$TYPE$$VAR$=$STRING$;"):
+            if(rule=="$TYPE$->$TOKEN$;"):
+                code="ALLOC "+str(oplist[0])+"\n" #
+            elif(rule=="$TYPE$->$TOKEN$=$STRING$;"):
                 pass #oplist[0]是var oplist[1]是strig
                 [base,length]=oplist[0].split(":")
                 string=oplist[1]
@@ -350,15 +357,12 @@ class Compoment:
                 if match!=None :
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
-                    if(self.name=="VAR"): #需要进行判断是什么词性
+                    if(self.name=="TOKEN"): #需要进行判断是什么词性
                         var_num="1"
                         var_name=match.group(1)
                         if(match.group(2)!=None): var_num=match.group(2)[1:-1] #判断一下有几个
-                        oplist.append(var_name) # 等待编译的时候进行修补！ #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！ 现在不需要你进行修补
-                        oplist.append(var_num)
+                        oplist.append(var_name+"-"+var_num) # 等待编译的时候进行修补！ #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！ 现在不需要你进行修补
                     elif(self.name=="CONST"):
-                        oplist.append(match.group(0))
-                    elif(self.name=="FUNCNAME"): #需要有一个table 
                         oplist.append(match.group(0))
                     elif(self.name=="STRING"): #需要有一个table 
                         oplist.append(match.group(0)[1:-1])
@@ -367,7 +371,7 @@ class Compoment:
                     elif(self.name=="TYPE"):
                         oplist.append(match.group(0)) #直接把类型放进去
                 else:
-                    #if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
+                    if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
                     return False,text_c,VarPos,oplist,codelist,r_logs
                 
             elif(rule.startswith("$")):
@@ -383,7 +387,7 @@ class Compoment:
                         codelist+=[code]
                     continue
                 else:
-                    #if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
+                    if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
                     return False,text_c,VarPos,oplist,codelist,r_logs
             else: #这里用来消除关键字
                     dollar_index = rule.find('$')
@@ -392,7 +396,7 @@ class Compoment:
                         text=text[len(keyword):]  
                         rule=rule[len(keyword):]  
                     else:
-                    #    if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
+                        if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
                         return False,text_c,VarPos,oplist,codelist,r_logs
         return True,text,VarPos,oplist,codelist,r_logs
             #匹配到Rule结束位置
@@ -476,7 +480,7 @@ class Compiler:
             if(single_succ==""):
                 print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
             else:
-                print("解析成功:",single_succ)
+                print("解析成功:",single_succ,"剩余:",textc if len(textc)<50 else textc[:50]+"...")
         return ans_code
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""

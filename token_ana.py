@@ -5,10 +5,26 @@ class token_type(Enum):
     variable=2
     structure=3
 class y_token:
-    def __init__(self,type,name=""):
+    def __init__(self,type=token_type.function,name=""):
         self.type=type
         self.name=name
-        pass
+    def set_as_function(self,name,paras=[]):
+        self.type=token_type.function
+        self.paras=paras
+        self.name=name
+    def set_as_variable(self,name,size,type):
+        self.type=token_type.variable
+        self.name=name
+        self.size=size
+        self.type=type
+    def set_as_structure(self,name,size,functions=[],vars=[]):  
+        self.type=token_type.structure
+        self.size=size
+        self.name=name
+        self.fuctions=functions
+        self.vars=vars
+    def get_type(self):
+        return self.type
 class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然需要用于操作数 每当有一个{}就需要实现一个添加一个新的作用域
     def __init__(self,father,name=" "):
         self.father=father
@@ -31,7 +47,7 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
         bfs=[]
         bfs.append(self.father)
         bfs.append(self)
-        while bfs.count()!=0:
+        while len(bfs)!=0:
             tmp=bfs.pop()
             if(tmp==None): continue
             bfs.append(tmp.father)
