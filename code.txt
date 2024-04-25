@@ -1,13 +1,18 @@
 #define testok test
 #include<lib/lib.txt>
+struct mys{
+    int->a;
+    double->b;
+}
+test[10].a[10]=1;
 func hello(a1,b1,){
     //print(a1);
-    double ans[2];
+    double->ans[2];
     ans[0]=1;
     if(a1>100000){
         ans[0]=a1;
     }else{
-        double tp;
+        double->tp;
         tp=a1+1/2;
         tp=tp+1*1;
         tp=tp-1*1;
@@ -20,11 +25,12 @@ func hello(a1,b1,){
 func test(p1,){
     *0=1020+23;
 }
-double a;
-double b;
-double bb[1];
-double c;
-double Y_c;
+mys->test;
+double->a;
+double->b;
+double->bb[1];
+double->c;
+double->Y_c;
 a=1;
 for(a=2;a<33333;a=a+1;){//3 millon instructs per seconds
     c=1;
@@ -40,7 +46,7 @@ c=a%b;
 c=!(a+b);
 c=&b[10];
 testok(c,)
-double d[10]="hello,world!!!";
+double->d[10]="hello,world!!!";
 c=0;
 while(d[c]!=0){
     print(d[c]);
@@ -48,10 +54,10 @@ while(d[c]!=0){
 }
 
 for(a=2;a<1000000;a=a+1;){
-    double ok;
+    double->ok;
     ok=1;
     for(b=2;b<a;b=b+1;){
-        double ans;
+        double->ans;
         ans=a%b;
         if(ans==0){
             ok=0;
@@ -62,7 +68,7 @@ for(a=2;a<1000000;a=a+1;){
     }
     if(ok==1){
         ok=1;
-        print_int(a,)
+        my_print_int(a,)
     }else{
         ok=1;
     }

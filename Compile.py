@@ -1,6 +1,7 @@
 import re,itertools
 from runner import Runner
 # 打开文本文件
+from token_ana import *
 from postprocesser import Postprocesser
 from preprocesser import Preprocesser
 
@@ -15,23 +16,20 @@ class Compoment:
         self.name=name_
         self.repeat=repeat_
         self.no_start=no_start
-    def Complie(self,rule,oplist,codelist,VarPos):
+    def Complie(self,rule,oplist,codelist,VarPos,area_tree):
         code=""
-        if(self.name=="VAR"): #如果是VARS需要对其做出修正！例如是a 100那就要翻译成a-100直接 #注意到！这里面可能有坑！需要real time计算位置
-            #可能会涉及到修改oplist a+i这边是静态 所以计算不出位置 需要写到代码里面去 所以必须设计新的指令系统
-            #MOV ECX $1
-            #ADD ECX i
-            #MOV $(11+$12)携程这种形式吧！
-            #其实应该在这里进行修正
+        return code #先把解析做好
+        if(self.name=="VAR"): 
+            #需要对VAR做出修正
             pass
         elif(self.name=="CONST"):
             pass
         elif(self.name=="REGS"):
             pass
-        elif(self.name=="DIM"):
-            if(rule=="double$VAR$;"):
+        elif(self.name=="DIM"): #这里要产生巨变！
+            if(rule=="$TYPE$$VAR$;"):
                 code="ALLOC "+str(oplist[0])+"\n"
-            elif(rule=="double$VAR$=$STRING$;"):
+            elif(rule=="$TYPE$$VAR$=$STRING$;"):
                 pass #oplist[0]是var oplist[1]是strig
                 [base,length]=oplist[0].split(":")
                 string=oplist[1]
@@ -289,10 +287,8 @@ class Compoment:
             code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
             #然后需要执行跳转！
             pass
-        elif(self.name=="FUNCNAME"):
-            #if(self.name=="FUNC"):
-            #这里可以分配标记！ 可以直接进行跳转标记
-            #ALLOC world
+        elif(self.name=="AREA"):
+            #在这里分配作用域
             pass
         elif(self.name=="PAR"):#这里是形参
             #code="SUB EBP 1\n" #不太需要动EBP
@@ -321,15 +317,22 @@ class Compoment:
                 pass 
             code+="JMP END\n"# 等到func来填充这个就可以了哦
             pass
+        elif(self.name=="TYPE"):
+            pass
+        elif(self.name=="STRUCTURE"):
+            a=1
+            VarPos.clear()#清空计数器
+            VarPos["SUM"]=0
+            pass
         #code="NOP \/\/"+rule+"\n"+code
         return code
-    def handelP(self,rule,text,VarPos,prefix): #按道理这个也应该返回一个oplist
+    def handelP(self,rule,text,VarPos,area_tree,prefix): #按道理这个也应该返回一个oplist
         #print("HandleP: Rule:",rule," Text: ",text)
         next_index = rule[1:].find('$')
         if(next_index==-1): return False
         name=rule[1:next_index+1]
-        return Compoment.Cs[name].Rrcognize(text,VarPos,rule,prefix)
-    def HandleR(self,rule,text,VarPos,prefix): #匹配失败返回原样
+        return Compoment.Cs[name].Rrcognize(text,VarPos,area_tree,rule,prefix)
+    def HandleR(self,rule,text,VarPos,area_tree,prefix): #匹配失败也不返回原样
         text_c=text
         oplist=[]#这里返回解析的每一个op!
         codelist=[]
@@ -338,7 +341,7 @@ class Compoment:
         while(rule!=""):
             if(text.startswith("1") and rule=="$OPN$"):
                     debug=1
-            if(rule[0]=="@"):
+            if(rule[0]=="@"): #这里很麻烦的啦！ 
                 next_index = rule[1:].find('@')
                 if(next_index==-1): 
                     return False,text_c,VarPos,oplist,codelist,r_logs
@@ -347,27 +350,12 @@ class Compoment:
                 if match!=None :
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
-                    #print("变量解析成功:",text,pattern)
                     if(self.name=="VAR"): #需要进行判断是什么词性
-                        if(pattern.startswith("E")):
-                            oplist.append(match.group(0))
-                        else:
-                            var_length="1"
-                            var_name=match.group(1)
-                            if(match.group(2)!=None):
-                                var_length=match.group(2)[1:-1] #这里是字符串
-                            if(var_name not in VarPos): 
-                                VarPos[var_name]=VarPos["SUM"]
-                                VarPos["SUM"]+=int(var_length)#这里必须成果！
-                            first="$"+str(VarPos[var_name])+":"
-                            if(var_length.isdigit()==True):
-                                if(match.group(2)==None):
-                                    second="0" #a=1 就是a[0]=1
-                                else:
-                                    second=var_length
-                            else:
-                                second="$"+str(VarPos[var_length])
-                            oplist.append(first+second) # #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！
+                        var_num="1"
+                        var_name=match.group(1)
+                        if(match.group(2)!=None): var_num=match.group(2)[1:-1] #判断一下有几个
+                        oplist.append(var_name) # 等待编译的时候进行修补！ #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！ 现在不需要你进行修补
+                        oplist.append(var_num)
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
                     elif(self.name=="FUNCNAME"): #需要有一个table 
@@ -376,14 +364,16 @@ class Compoment:
                         oplist.append(match.group(0)[1:-1])
                     elif(self.name=="REGS"):
                         oplist.append(match.group(0)) #直接把名称放进去
-
+                    elif(self.name=="TYPE"):
+                        oplist.append(match.group(0)) #直接把类型放进去
                 else:
-                    
+                    #if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
                     return False,text_c,VarPos,oplist,codelist,r_logs
                 
             elif(rule.startswith("$")):
-
-                succ,text,code,VarPos,r_oplist,logs=self.handelP(rule,text,VarPos,prefix+"  ") #消除掉rule部分 并且这里的code 没有用上！
+                if(rule=="$AREA$"):
+                    debug=1
+                succ,text,code,VarPos,r_oplist,logs=self.handelP(rule,text,VarPos,area_tree,prefix+"  ") #消除掉rule部分 并且这里的code 没有用上！
                 if(succ==True):
                     r_logs+=logs
                     dollar_index = rule[1:].find('$')
@@ -393,19 +383,21 @@ class Compoment:
                         codelist+=[code]
                     continue
                 else:
+                    #if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
                     return False,text_c,VarPos,oplist,codelist,r_logs
-            else:
+            else: #这里用来消除关键字
                     dollar_index = rule.find('$')
                     keyword=rule[:dollar_index] if dollar_index != -1 else rule
                     if(text.startswith(keyword)):
                         text=text[len(keyword):]  
                         rule=rule[len(keyword):]  
                     else:
+                    #    if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
                         return False,text_c,VarPos,oplist,codelist,r_logs
         return True,text,VarPos,oplist,codelist,r_logs
             #匹配到Rule结束位置
     
-    def Rrcognize(self,text,VarPos,toprule="",prefix=""):
+    def Rrcognize(self,text,VarPos,area_tree,toprule="",prefix=""):
         #如果是repeat的话 还需要重复！
         #print("Rrcognize: name: ",self.name, "Text: ",text)
 
@@ -430,26 +422,21 @@ class Compoment:
                         succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[key]
                 else:
                     Compoment.unmatch[key]="PROCESSING"
-                    #print(prefix+"(","解析规则 中，规则名称:",rule," 代码:",textc)
-                    succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,prefix+"   ") #这里面没有传入代码 
+                    succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,area_tree,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[key]=(succ,text,VarPos,oplist,code_list,logs1)
-                    #所以就算是解析成功也无法返回
-                    #print(prefix,"解析规则 状态:",succ,"规则名称:",rule,")")
                 if(succ):
                     flag=True
                     repeat=self.repeat
                     r_oplist=oplist
-                    #在这里构建code!
-                    #print(self.name,rule,oplist,code_list,VarPos)
-                    compiled_code=self.Complie(rule,oplist,code_list,VarPos) 
+                    compiled_code=self.Complie(rule,oplist,code_list,VarPos,area_tree) 
                     first_enter=compiled_code.find("\n")
                     if(first_enter!=-1):
                         compiled_code=compiled_code[:first_enter]+"//"+textc[:len(textc)-len(text)]+compiled_code[first_enter:]
                     r_code+=compiled_code #+" Rule: "+rule
                     this_log="***************Text*************** \n"+textc[:len(textc)-len(text)]+"\n***************Code***************\n"+compiled_code
                     logs=logs1+this_log
-                    #print(this_log)
                     break   #这里仿佛也不应该call;最好是用 
+                
 
         return flag,text,r_code,VarPos,r_oplist,logs
     
@@ -461,6 +448,14 @@ class Compiler:
     def ana2(self,text,codes,VarPos={},prefix=""):
         state=[(text,codes,VarPos,prefix)]
         ans_code=""
+        area_tree=varea(None)
+        t=y_token(type=token_type.structure)
+        t.name="int"
+        t.size=1
+        area_tree.append_var(t)
+        t.name="double"
+        t.size=1
+        area_tree.append_var(t)
         while len(state)!=0:
             (n_text,n_codes,n_VarPos,n_prefix)=state[0]
             print(f"编译进度:{100-100*len(n_text)/len(text):.2f}%")
@@ -468,16 +463,20 @@ class Compiler:
             if(n_text==""):
                 ans_code=n_codes
                 break
-            single_succ=False
+            single_succ=""
             for name,sentence in Compoment.Cs.items():
                 if(sentence.no_start==True): continue
-                succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(n_text,n_VarPos,"",n_prefix+"   ")
+                succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(n_text,n_VarPos,area_tree,"",n_prefix+"   ")
                 if(succ==True):
                     state.append((textc,n_codes+code,VarPos,"   "+prefix))
-                    single_succ=True
+                    single_succ=name
                     break
-            if(single_succ==False):
+                # else:
+                #     assert(textc==n_text)
+            if(single_succ==""):
                 print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
+            else:
+                print("解析成功:",single_succ)
         return ans_code
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""
@@ -488,8 +487,6 @@ class Compiler:
         flag=False
         for name,sentence in Compoment.Cs.items():
             if(sentence.no_start==True): continue
-            if(text.startswith("c>0;)") and name=="$JUDGE$"):
-                 debug=1
             #print(prefix+"[ ","解析语法中 规则名称: ",name," 代码:",text)
             succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(text,VarPos,"",prefix+"   ")
             #print(prefix,"解析语法结果 状态:",succ,"规则名称: ",name, " Text: ",text[:len(text)-len(textc)],"codes:",code+" ]")
@@ -539,19 +536,20 @@ class Compiler:
         self.error=False
         #做好预处理，先把函数的编译出来，然后在这里进行组装,
         return self.ana2(text,"",{"SUM":0})
-a=Compiler()
-b=Runner()
-c=Postprocesser()
-d=Preprocesser()
-a.construct_componets("Config.txt")
-with open("code.txt", 'r', encoding='utf-8') as file:
-    content = file.read()
-preprocessed_code=d.process(content)
-code=a.Complie_file(preprocessed_code)
-print(code)
-code=c.process(code)
-with open("IR.txt", 'w', encoding='utf-8') as file:
-    file.write(code)
-b.Run_from_code(code.split("\n"))
+if __name__=="__main__":
+    a=Compiler()
+    b=Runner()
+    c=Postprocesser()
+    d=Preprocesser()
+    a.construct_componets("Config.txt")
+    with open("code.txt", 'r', encoding='utf-8') as file:
+        content = file.read()
+    preprocessed_code=d.process(content)
+    code=a.Complie_file(preprocessed_code)
+    print(code)
+    code=c.process(code)
+    with open("IR.txt", 'w', encoding='utf-8') as file:
+        file.write(code)
+    b.Run_from_code(code.split("\n"))
 
 

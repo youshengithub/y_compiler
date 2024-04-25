@@ -1,3 +1,4 @@
+
 func max(a,b,){
     if(a>b){
         return a;
@@ -12,7 +13,7 @@ func min(a,b,){
         return a;
     }
 }
-func print_int(a,){
+func my_print_int(a,){
     if(a==0){
         print(48);
     }else{
@@ -22,8 +23,8 @@ func print_int(a,){
         }else{
             a=a*1;
         }
-        double res[30];
-        double length;
+        double->res[30];
+        double->length;
         length=0;
         while(a!=0){
             res[length]=(a%10)+48;

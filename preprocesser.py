@@ -45,7 +45,7 @@ class Preprocesser:
                     line=line.replace(k,v)
                 code+=line+"\n"
         return code
-    def process_space(self,text):
+    def process_space(self,text): #这样处理会失去边界定义需要换一条句子dim-> 表示 to这个怎么样 我觉得还行
         return text.replace('\n', '').replace(' ', '').replace('\t', '')
     def process(self,text):#处理预处理器命令#
         text=self.process_include(text)
