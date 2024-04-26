@@ -1,7 +1,7 @@
 #define testok test
 #include<lib/lib.txt>
 
-struct mys{
+class mys{
     int->a;
     double->b;
     func he(a,){

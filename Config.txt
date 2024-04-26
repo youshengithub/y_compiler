@@ -1,8 +1,8 @@
 TYPE:@^double@ # @^int@ # $TOKEN$:NO_START# 
-STRUCTURE:struct$TOKEN$$AREA$: # 
-TOKEN:@(^(?!double)(?!struct)(?!in)(?!if)(?!do)(?!while)(?!for)(?!print)(?!else)(?!func)(?!return)(?!struct)(?!int)(?!double)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])?@: NO_START# 
+STRUCTURE:<struct|class>$TOKEN$$AREA$: # 
+TOKEN:@(^(?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*@: NO_START# 
 REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# 
-VAR: $TOKEN$.$VAR$ # $TOKEN$ # $REGS$  :NO_START# 
+VAR: @((^(?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ # $REGS$  :NO_START# 
 CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
 STRING:@^"([^"]|(\\"))*"@:NO_START# 
 OPN:$VAR$ # $CONST$ # ($OPN$) :NO_START# 
@@ -32,5 +32,6 @@ PRINT:print($OPN$);# :
 CALL:$TOKEN$(<$ARG$|>):
 ARG:$OPN$# ,# :NO_START# REPEAT# 
 PAR:$VAR$,# :NO_START# REPEAT# 
-FUNC:func$TOKEN$(<$PAR$|>)$AREA$:
+FUNCNAME:$TOKEN$:NO_START# 
+FUNC:func$FUNCNAME$(<$PAR$|>)$AREA$:
 RETURN:return<$OP$|$OPN$|>;:NO_START# 

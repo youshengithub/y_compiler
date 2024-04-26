@@ -1,4 +1,4 @@
-import re,itertools
+import re,itertools,copy
 from runner import Runner
 # 打开文本文件
 from token_ana import *
@@ -20,31 +20,82 @@ class Compoment:
         code=""
         #return code
         if(self.name=="VAR"): 
-            #判断token的类型
-            #需要对VAR做出修正
-            #在这里找到正确的位置 判断是不是DIM里面的#反正在这里必须进行替换！！！
-            if(area_tree.find_token(oplist)):
-                
-                pass
+            if(oplist[0]!="EAX"):#
+                var=y_token.trans_var(oplist[0])
+                base=0
+                #ESP的位置用于存储temp变量
+                for i in var:
+                    find_var=area_tree.find_token(i[0]) #看一看是啥子类型
+                    base=find_var.start_pos
+                    if(find_var==None):
+                        print("变量未定义",oplist[0],"--->",i[0])
+                        assert(1==0)
+                    if(len(i[1:])!=len(find_var.muti_dimension)):
+                        print("维度不匹配 ",oplist[0],"--->",i[0]," 变量原始维度:",len(find_var.muti_dimension),"变量引用维度:",len(i)-1)
+                        assert(1==0)
+                    code+="MOV EAX "+str(base)+"\n"#载入0号位置
+                    accumulate_demension=[]
+                    current=1
+                    for demension in reversed(find_var.muti_dimension):
+                        accumulate_demension.append(current)
+                        current*=demension
+                    accumulate_demension=list(reversed(accumulate_demension))
+                    for index in range(len(find_var.muti_dimension)) :
+                        #需要判断是j是数字还是变量
+                        if(i[index+1].isdigit()):
+                            if(int(i[index+1])>find_var.muti_dimension[index]): #算了 不想去判断:
+                                print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[i],"变量引用维度:",int(i[index+1]))
+                                assert(1==0)
+                            code+="MOV EBX "+i[index+1]+"\n"
+                        else:
+                            find_var=area_tree.find_token(i[index+1]) 
+                            if(find_var==None):
+                                print("变量未定义",oplist[0],"--->",i[index+1])
+                                assert(1==0)
+                            code+="MOV EBX "+find_var.start_pos+"\n"
+                        code+="MUL EBX "+str(accumulate_demension[index])+"\n"
+                        code+="ADD EAX EBX\n"
+                            #寻找到变量位置                 
+                    #最后 EAX就是变量的位置！
+                    oplist.clear()
+                    oplist.append("EAX")   
         elif(self.name=="TOKEN"): #注意到有些token是
             #看一看到底是哪一个token  
             pass
         elif(self.name=="CONST"):
             pass
+        elif(self.name=="AREA"):
+            for i in codelist:code+=i
         elif(self.name=="REGS"):
             pass
         elif(self.name=="DIM"): #这里要产生巨变！
-            if(rule=="$TYPE$->$TOKEN$;"):
-                code="ALLOC "+str(oplist[0])+"\n" #
+            type=oplist[0]
+            #解析一下a[10][10]这种类型的
+            var=y_token.trans_token(oplist[1])
+            num=1
+            for i in var[1:]: num*=int(i)
+            find_type=area_tree.find_token(type)
+            if(find_type==None):
+                print("编译出错,类型未定义")
+                assert("1==0")
+            if(rule=="$TYPE$->$TOKEN$;"): #进行解析
+                start_pos=area_tree.clac_current_pos()
+                t=y_token()
+                t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
+                area_tree.append_var(t)
+                code="ALLOC "+str(t.size)+"\n" #
             elif(rule=="$TYPE$->$TOKEN$=$STRING$;"):
                 pass #oplist[0]是var oplist[1]是strig
-                [base,length]=oplist[0].split(":")
-                string=oplist[1]
-                length=int(length)
+                assert(type=="int" or type=="double")
+                string=oplist[2]
+                length=num
                 if(length<len(string)):
                     length=len(string)
-                revise_var=base+":"+str(length)
-                code="ALLOC "+str(revise_var)+"\n"   
+                code="ALLOC "+str(length)+"\n"  
+                base=area_tree.clac_current_pos() 
+                t=y_token()
+                t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
+                area_tree.append_var(t)
                 for i in range(len(string)):
                     code+="MOV "+base+":"+str(i)+" "+str(ord(string[i]))+ "\n"
                 code+="MOV "+base+":"+str(len(string))+ " 0\n"
@@ -248,6 +299,9 @@ class Compoment:
             pass
         elif(self.name=="IN"):
             code="IN EAX\n"
+        elif(self.name=="FUNCNAME"):
+            
+            pass#在这里就要创建新的顶级域了
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
             revise_code=code.split("\n")[:-1]
@@ -327,10 +381,9 @@ class Compoment:
         elif(self.name=="TYPE"):
             pass
         elif(self.name=="STRUCTURE"):
-            a=1
-            VarPos.clear()#清空计数器
-            VarPos["SUM"]=0
-            pass
+            t=y_token()
+            t.set_as_structure(oplist[0],1,[],[])
+            area_tree.append_var(t)
         #code="NOP \/\/"+rule+"\n"+code
         return code
     def handelP(self,rule,text,VarPos,area_tree,prefix): #按道理这个也应该返回一个oplist
@@ -355,13 +408,11 @@ class Compoment:
                 pattern=rule[1:next_index+1] 
                 match = re.search(pattern, text)
                 if match!=None :
+                    match_text=text[:match.regs[0][1]]
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
-                    if(self.name=="TOKEN"): #需要进行判断是什么词性
-                        var_num="1"
-                        var_name=match.group(1)
-                        if(match.group(2)!=None): var_num=match.group(2)[1:-1] #判断一下有几个
-                        oplist.append(var_name+"-"+var_num) # 等待编译的时候进行修补！ #MOV $1:$2 or $1:2实际位置就是 携程这种形式吧！ 现在不需要你进行修补
+                    if(self.name=="VAR"): #需要进行判断是什么词性
+                        oplist.append(match_text)
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
                     elif(self.name=="STRING"): #需要有一个table 
@@ -370,6 +421,8 @@ class Compoment:
                         oplist.append(match.group(0)) #直接把名称放进去
                     elif(self.name=="TYPE"):
                         oplist.append(match.group(0)) #直接把类型放进去
+                    elif(self.name=="TOKEN"):
+                        oplist.append(match_text) #直接把token放进去
                 else:
                     if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
                     return False,text_c,VarPos,oplist,codelist,r_logs
@@ -456,7 +509,7 @@ class Compiler:
         t=y_token(type=token_type.structure)
         t.name="int"
         t.size=1
-        area_tree.append_var(t)
+        area_tree.append_var(copy.deepcopy(t))
         t.name="double"
         t.size=1
         area_tree.append_var(t)
