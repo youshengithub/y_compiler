@@ -36,4 +36,6 @@ tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
 PAR:$tPAR$:
 FUNCNAME:$TOKEN$:NO_START# 
 FUNC:$TYPE$--$FUNCNAME$(<$PAR$|>)$AREA$:
-RETURN:return<$OP$|$OPN$|>:NO_START# 
+RETURN:return<$OP$|$OPN$|>:NO_START#
+OPS:@^+@ # @^-@ # @^*@ # @^/@ # @^&@ # @^|@ # @^!@ # @^^@ # @^%@ :NO_START# 
+OPERATOR:$TYPE$--$OPS$--$FUNCNAME$(<$PAR$|>)$AREA$:
