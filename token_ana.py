@@ -48,10 +48,10 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
         self.name=name
         self.is_top_area=is_top_area
         self.current_pos=0
-    def new_area(self):
+    def new_area(self,is_top_area):
         if not hasattr(self,"areas"):
             self.areas=[]
-        area=varea(self)
+        area=varea(self,is_top_area)
         self.areas.append(area)
         return area
     def append_area(self,area):

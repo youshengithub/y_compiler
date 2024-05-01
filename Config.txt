@@ -1,8 +1,8 @@
-TYPE:@^double@ # @^int@ # $TOKEN$:NO_START# 
+TYPE:@^double@ # @^int@ # @^void@ # $TOKEN$:NO_START# 
 STRUCTURE:<struct|class>$TOKEN$$AREA$: # 
-TOKEN:@(^(?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*@: NO_START# 
+TOKEN:@(^(?!struct$)(?!class$)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*@: NO_START# 
 REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# 
-VAR: @((^(?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ # $REGS$  :NO_START# 
+VAR: @((^(?!struct$)(?!class$)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ # $REGS$  :NO_START# 
 CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
 STRING:@^"([^"]|(\\"))*"@:NO_START# 
 OPN:$VAR$ # $CONST$ # ($OPN$) :NO_START# 
@@ -19,19 +19,21 @@ MOD:$<OP|OPN>$%$<OP|OPN>$:NO_START#
 GETP:&$VAR$:NO_START# 
 SETP:*$<OP|OPN>$:NO_START# 
 IN:in():NO_START# 
-DIM:$TYPE$->$TOKEN$;# $TYPE$->$TOKEN$=$STRING$;:REPEAT# 
-EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$>;# :
-SENTENCE:$JUDGE$# $FOR$# $DO$# $WHILE$# $IF$# $EQUAL$# $PRINT$# $DIM$# $CALL$ # $RETURN$ # $FUNC$ :REPEAT# 
+DIM:$TYPE$->$TOKEN$=$STRING$ # $TYPE$->$TOKEN$:REPEAT# NO_START# 
+EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$># :NO_START# 
+SENTENCE:$JUDGE$;# $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$;# $DIM$; # $CALL$; # $RETURN$; # $FUNC$<;|> :REPEAT# 
 AREA:{$SENTENCE$}:# 
 JUDGE:$OPN$==$OPN$# $OPN$>$OPN$# $OPN$<$OPN$# $OPN$!=$OPN$# $OPN$<=$OPN$# $OPN$>=$OPN$# ($JUDGE$)# $JUDGE$&&$JUDGE$# $JUDGE$||$JUDGE$# :
 IF:if($JUDGE$)$AREA$<else$AREA$|># :
 DO:do$AREA$while($JUDGE$)# :
 WHILE:while($JUDGE$)$AREA$# :
-FOR:for($EQUAL$$JUDGE$;$EQUAL$)$AREA$ :
-PRINT:print($OPN$);# :
+FOR:for($EQUAL$;$JUDGE$;$EQUAL$)$AREA$ :
+PRINT:out($OPN$)# :
 CALL:$TOKEN$(<$ARG$|>):
-ARG:$OPN$# ,# :NO_START# REPEAT# 
-PAR:$VAR$,# :NO_START# REPEAT# 
+ARG:$tARG$ # :NO_START# REPEAT# 
+tARG:$OP$,$tARG$ #  $OPN$,$tARG$  # $OP$ # $OPN$  :NO_START#
+tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
+PAR:$tPAR$:
 FUNCNAME:$TOKEN$:NO_START# 
-FUNC:func$FUNCNAME$(<$PAR$|>)$AREA$:
-RETURN:return<$OP$|$OPN$|>;:NO_START# 
+FUNC:$TYPE$--$FUNCNAME$(<$PAR$|>)$AREA$:
+RETURN:return<$OP$|$OPN$|>:NO_START# 

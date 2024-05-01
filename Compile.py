@@ -18,7 +18,7 @@ class Compoment:
         self.no_start=no_start
     def Complie(self,rule,oplist,codelist,VarPos,area_tree):
         code=""
-        #return code
+        return code
         if(self.name=="VAR"): 
             if(oplist[0]!="EAX"):#
                 var=y_token.trans_var(oplist[0])
@@ -300,7 +300,9 @@ class Compoment:
         elif(self.name=="IN"):
             code="IN EAX\n"
         elif(self.name=="FUNCNAME"):
-            
+            sub_area=area_tree.new_area(True)
+            area_tree=sub_area#创建顶级域 在AREA的时候恢复顶级域
+            sub_area.name=oplist[0]#创建顶级域的名字
             pass#在这里就要创建新的顶级域了
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
