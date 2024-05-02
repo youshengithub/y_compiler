@@ -11,14 +11,15 @@ class token:#token类
 class Compoment:
     Cs={}   #语句类型
     unmatch={}
-    def __init__(self, name_,config_,repeat_,no_start):
+    def __init__(self, name_,config_,repeat_,no_start,is_keywords):
         self.configs=config_
         self.name=name_
         self.repeat=repeat_
         self.no_start=no_start
+        self.is_keywords=is_keywords
     def Complie(self,rule,oplist,codelist,VarPos,area_tree):
         code=""
-        return code
+        #return code
         if(self.name=="VAR"): 
             if(oplist[0]!="EAX"):#
                 var=y_token.trans_var(oplist[0])
@@ -52,7 +53,7 @@ class Compoment:
                             if(find_var==None):
                                 print("变量未定义",oplist[0],"--->",i[index+1])
                                 assert(1==0)
-                            code+="MOV EBX "+find_var.start_pos+"\n"
+                            code+="MOV EBX "+str(find_var.start_pos)+"\n"
                         code+="MUL EBX "+str(accumulate_demension[index])+"\n"
                         code+="ADD EAX EBX\n"
                             #寻找到变量位置                 
@@ -78,13 +79,13 @@ class Compoment:
             if(find_type==None):
                 print("编译出错,类型未定义")
                 assert("1==0")
-            if(rule=="$TYPE$->$TOKEN$;"): #进行解析
+            if(rule=="$TYPE$->$TOKEN$"): #进行解析
                 start_pos=area_tree.clac_current_pos()
                 t=y_token()
                 t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
                 area_tree.append_var(t)
                 code="ALLOC "+str(t.size)+"\n" #
-            elif(rule=="$TYPE$->$TOKEN$=$STRING$;"):
+            elif(rule=="$TYPE$->$TOKEN$=$STRING$"):
                 pass #oplist[0]是var oplist[1]是strig
                 assert(type=="int" or type=="double")
                 string=oplist[2]
@@ -92,7 +93,7 @@ class Compoment:
                 if(length<len(string)):
                     length=len(string)
                 code="ALLOC "+str(length)+"\n"  
-                base=area_tree.clac_current_pos() 
+                base=str(area_tree.clac_current_pos()) 
                 t=y_token()
                 t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
                 area_tree.append_var(t)
@@ -223,17 +224,17 @@ class Compoment:
             pass
         elif(self.name=="EQUAL"):
             #可能会有code针对左边的地方进行计算！
-            if(rule=="$VAR$=$OPN$;"):
+            if(rule=="$VAR$=$OPN$"):
                 code="MOV "+str(oplist[0]) +" "+str(oplist[1])+"\n"
-            elif(rule=="$VAR$=$OP$;"):   
+            elif(rule=="$VAR$=$OP$"):   
                 code=codelist[0]
                 code+= "MOV "+str(oplist[0])  + " EAX\n"
-            elif(rule=="$SETP$=$OPN$;"):  #这里可能会有点问题 
+            elif(rule=="$SETP$=$OPN$"):  #这里可能会有点问题 
                 for i in codelist: code+=i 
                 code+="POP EBX\n"
                 code+="SEA EBX "+str(oplist[-1])+"\n" #这里的oplist不一定多少个数据
                 pass
-            elif(rule=="$SETP$=$OP$;"):
+            elif(rule=="$SETP$=$OP$"):
                 for i in codelist: code+=i 
                 code+="POP EBX\n"
                 code+="SEA EBX EAX\n"
@@ -400,6 +401,7 @@ class Compoment:
         codelist=[]
         #print("HandleR: Rule:",rule," Text: ",text)
         r_logs=""
+        c_rule=rule
         while(rule!=""):
             if(text.startswith("1") and rule=="$OPN$"):
                     debug=1
@@ -410,10 +412,12 @@ class Compoment:
                 pattern=rule[1:next_index+1] 
                 match = re.search(pattern, text)
                 if match!=None :
-                    match_text=text[:match.regs[0][1]]
+                    match_text=text[:match.regs[0][1]] #仿佛这是最简单的办法
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
                     if(self.name=="VAR"): #需要进行判断是什么词性
+                        if match_text in ["struct","class","void","in","if","do","while","for","out","else","func","return","struct","int","double","continue"] :
+                            return False,text_c,VarPos,oplist,codelist,r_logs
                         oplist.append(match_text)
                     elif(self.name=="CONST"):
                         oplist.append(match.group(0))
@@ -424,9 +428,11 @@ class Compoment:
                     elif(self.name=="TYPE"):
                         oplist.append(match.group(0)) #直接把类型放进去
                     elif(self.name=="TOKEN"):
+                        if match_text in ["struct","class","void","in","if","do","while","for","out","else","func","return","struct","continue"] :
+                            return False,text_c,VarPos,oplist,codelist,r_logs
                         oplist.append(match_text) #直接把token放进去
                 else:
-                    if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
+                    #if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
                     return False,text_c,VarPos,oplist,codelist,r_logs
                 
             elif(rule.startswith("$")):
@@ -442,7 +448,7 @@ class Compoment:
                         codelist+=[code]
                     continue
                 else:
-                    if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
+                    #if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
                     return False,text_c,VarPos,oplist,codelist,r_logs
             else: #这里用来消除关键字
                     dollar_index = rule.find('$')
@@ -451,8 +457,9 @@ class Compoment:
                         text=text[len(keyword):]  
                         rule=rule[len(keyword):]  
                     else:
-                        if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
+                        #if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
                         return False,text_c,VarPos,oplist,codelist,r_logs
+        print("识别成功:",self.name,"->",text_c,"--->",c_rule)
         return True,text,VarPos,oplist,codelist,r_logs
             #匹配到Rule结束位置
     
@@ -483,7 +490,7 @@ class Compoment:
                     Compoment.unmatch[key]="PROCESSING"
                     succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,area_tree,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[key]=(succ,text,VarPos,oplist,code_list,logs1)
-                if(succ):
+                if(succ): 
                     flag=True
                     repeat=self.repeat
                     r_oplist=oplist
@@ -589,7 +596,7 @@ class Compiler:
                 for config in configs:
                     revised_configs+=self.revise_config(config)
                 print(name,revised_configs)
-                Compoment.Cs[name]=Compoment (name,revised_configs,"REPEAT" in attribute, "NO_START" in attribute)  
+                Compoment.Cs[name]=Compoment (name,revised_configs,"REPEAT" in attribute, "NO_START" in attribute,"IS_KEYWORDS" in attribute)  
     def Complie_file(self,text):
 
         self.error=False
