@@ -42,27 +42,31 @@ class y_token:
         for i in tokens:
             ans.append(y_token.trans_token(i))
         return ans
+    def __str__(self):
+        ans=f'token名:{self.name},类型:{self.type}\n'
+        return ans
+    def __repr__(self):
+        return self.__str__()
 class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然需要用于操作数 每当有一个{}就需要实现一个添加一个新的作用域
-    def __init__(self,father,is_top_area=True,name=" "): 
+    def __init__(self,father,is_top_area=True,name=" ",level=1): 
         self.father=father
         self.name=name
         self.is_top_area=is_top_area
         self.current_pos=0
-    def new_area(self,is_top_area):
+        self.areas=[]
+        self.vars=[]
+        self.level=level
+    def new_area(self,is_top_area,name=""):
         if not hasattr(self,"areas"):
             self.areas=[]
-        area=varea(self,is_top_area)
+        area=varea(self,is_top_area,name,self.level+1)
         self.areas.append(area)
         return area
     def append_area(self,area):
-        if not hasattr(self,"areas"):
-            self.areas=[]
         self.areas.append(area)
     def add_current_pos(self,size):
         self.current_pos+=size
     def append_var(self,var,size=0): #有的是类型，有的是函数,只有变量才需要size  注意到类型不需要大小！
-        if not hasattr(self,"vars"):
-            self.vars=[]
         self.vars.append(var)
         self.find_top_father().add_current_pos(size) #只在顶级域里面加入size 每一个函数都是一个顶级域,
     def find_top_father(self):
@@ -70,7 +74,20 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
         else: return self.father.find_top_father()
     def clac_current_pos(self):
         return self.find_top_father().current_pos
-    def find_token(self,name,area_name=" "):#沿树寻找
+    def __str__(self):
+        ans=" "*self.level+f'层级:{self.level},顶级域:{self.is_top_area},区域名{self.name},token数:{len(self.vars)},区域数:{len(self.areas)}\n'
+        if self.vars!=[]:
+            ans+=" "*self.level+"--展示变量中--\n"
+            for i in self.vars:
+                ans+=" "*(self.level+1)+str(i)
+        if self.areas!=[]:
+            ans+=" "*self.level+"--展示区域中--\n"
+            for i in self.areas:
+                ans+=" "*self.level+str(i)
+        return ans+"\n"
+    def __repr__(self):
+        return self.__str__()
+    def find_token(self,name,area_name="Main"):#沿树寻找
         bfs=[]
         bfs.append(self.father)
         bfs.append(self)
@@ -78,17 +95,24 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
             tmp=bfs.pop()
             if(tmp==None): continue
             bfs.append(tmp.father)
-            if(area_name!=tmp.name): continue
+            #if(area_name!=tmp.name): continue
             if hasattr(tmp,"vars"):
                 for i in tmp.vars:
                     if i.name==name:
                         return i   
-        return None                 
+        return None          
+def test(area_tree):
+    sub_area=area_tree.new_area(True) #添加子节点
+    area_tree=sub_area #使得子节点成为当前节点
 if __name__=="__main__":
     a=varea(None)
-    b=varea(a)
-    a.append_area(b)
-    a.append_var(y_token(token_type.variable))
     print(a)
-    print(y_token.trans_var("a[10][c].b[i][j]"))
+    test(a)
+    print(a)
     
+    
+    # b=varea(a)
+    # a.append_area(b)
+    # a.append_var(y_token(token_type.variable))
+    # print(a)
+    # print(y_token.trans_var("a[10][c].b[i][j]"))

@@ -76,14 +76,19 @@ class Compoment:
             num=1
             for i in var[1:]: num*=int(i)
             find_type=area_tree.find_token(type)
+            find_var=area_tree.find_token(var[0])
+            if(find_var!=None):
+                print("重定义符号")
+                assert(1==0)
             if(find_type==None):
                 print("编译出错,类型未定义")
                 assert("1==0")
             if(rule=="$TYPE$->$TOKEN$"): #进行解析
+                
                 start_pos=area_tree.clac_current_pos()
                 t=y_token()
                 t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
-                area_tree.append_var(t)
+                area_tree.append_var(t,t.size) #只有变量才会分配区域大小
                 code="ALLOC "+str(t.size)+"\n" #
             elif(rule=="$TYPE$->$TOKEN$=$STRING$"):
                 pass #oplist[0]是var oplist[1]是strig
@@ -301,9 +306,8 @@ class Compoment:
         elif(self.name=="IN"):
             code="IN EAX\n"
         elif(self.name=="FUNCNAME"):
-            sub_area=area_tree.new_area(True)
+            sub_area=area_tree.new_area(True,oplist[0])
             area_tree=sub_area#创建顶级域 在AREA的时候恢复顶级域
-            sub_area.name=oplist[0]#创建顶级域的名字
             pass#在这里就要创建新的顶级域了
         elif(self.name=="FUNC"):#在定义的时候，不要执行语句
             for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
@@ -321,9 +325,8 @@ class Compoment:
             code+="MOV EBP $0:-5\n" #使用临时寄存器ETP暂时保存该跳转的结果。
             code+="MOV EIP ETP\n"
             code="JMP "+str(code.count("\n")+1)+"\n"+code
-            code="ALLOC @"+oplist[0]+"\n"+code
-            VarPos.clear()
-            VarPos["SUM"]=0
+            code="ALLOC @"+oplist[1]+"\n"+code
+            area_tree=area_tree.father
             #code=codelist[0] #还没处理return问题嘞
             pass
         elif(self.name=="CALL"):#call 然后eax传入参数！
@@ -387,8 +390,11 @@ class Compoment:
             t=y_token()
             t.set_as_structure(oplist[0],1,[],[])
             area_tree.append_var(t)
+        elif(self.name=="ASM"):
+            code+=oplist[0].replace("\\n","\n")
+            pass
         #code="NOP \/\/"+rule+"\n"+code
-        return code
+        return code,area_tree
     def handelP(self,rule,text,VarPos,area_tree,prefix): #按道理这个也应该返回一个oplist
         #print("HandleP: Rule:",rule," Text: ",text)
         next_index = rule[1:].find('$')
@@ -402,6 +408,7 @@ class Compoment:
         #print("HandleR: Rule:",rule," Text: ",text)
         r_logs=""
         c_rule=rule
+        c_area_tree=copy.deepcopy(area_tree)
         while(rule!=""):
             if(text.startswith("1") and rule=="$OPN$"):
                     debug=1
@@ -416,7 +423,7 @@ class Compoment:
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
                     if(self.name=="VAR"): #需要进行判断是什么词性
-                        if match_text in ["struct","class","void","in","if","do","while","for","out","else","func","return","struct","int","double","continue"] :
+                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","else","func","return","struct","int","double","continue"] :
                             return False,text_c,VarPos,oplist,codelist,r_logs
                         oplist.append(match_text)
                     elif(self.name=="CONST"):
@@ -428,7 +435,7 @@ class Compoment:
                     elif(self.name=="TYPE"):
                         oplist.append(match.group(0)) #直接把类型放进去
                     elif(self.name=="TOKEN"):
-                        if match_text in ["struct","class","void","in","if","do","while","for","out","else","func","return","struct","continue"] :
+                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","else","func","return","struct","continue"] :
                             return False,text_c,VarPos,oplist,codelist,r_logs
                         oplist.append(match_text) #直接把token放进去
                 else:
@@ -438,7 +445,8 @@ class Compoment:
             elif(rule.startswith("$")):
                 if(rule=="$AREA$"):
                     debug=1
-                succ,text,code,VarPos,r_oplist,logs=self.handelP(rule,text,VarPos,area_tree,prefix+"  ") #消除掉rule部分 并且这里的code 没有用上！
+                
+                succ,text,code,VarPos,r_oplist,logs,area_tree=self.handelP(rule,text,VarPos,c_area_tree,prefix+"  ") #消除掉rule部分 并且这里的code 没有用上！
                 if(succ==True):
                     r_logs+=logs
                     dollar_index = rule[1:].find('$')
@@ -472,6 +480,7 @@ class Compoment:
         repeat=True
         r_oplist=[]
         r_code=""
+        r_area_tree=copy.deepcopy(area_tree)
         logs=""
         if(text.startswith("a=1+(23)") and self.name=="VAR"):
             debug=1
@@ -488,13 +497,14 @@ class Compoment:
                         succ,text,VarPos,oplist,code_list,logs1=Compoment.unmatch[key]
                 else:
                     Compoment.unmatch[key]="PROCESSING"
-                    succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,area_tree,prefix+"   ") #这里面没有传入代码 
+                    succ,text,VarPos,oplist,code_list,logs1=self.HandleR(rule,textc,VarPos,r_area_tree,prefix+"   ") #这里面没有传入代码 
                     Compoment.unmatch[key]=(succ,text,VarPos,oplist,code_list,logs1)
                 if(succ): 
                     flag=True
                     repeat=self.repeat
                     r_oplist=oplist
-                    compiled_code=self.Complie(rule,oplist,code_list,VarPos,area_tree) 
+                    #compiled_code,area_tree=self.Complie(rule,oplist,code_list,VarPos,r_area_tree) 
+                    compiled_code=[(rule,oplist,code_list,VarPos)]
                     first_enter=compiled_code.find("\n")
                     if(first_enter!=-1):
                         compiled_code=compiled_code[:first_enter]+"//"+textc[:len(textc)-len(text)]+compiled_code[first_enter:]
@@ -504,7 +514,7 @@ class Compoment:
                     break   #这里仿佛也不应该call;最好是用 
                 
 
-        return flag,text,r_code,VarPos,r_oplist,logs
+        return flag,text,r_code,VarPos,r_oplist,logs,area_tree if flag==True else r_area_tree
     
 
 class Compiler:
@@ -513,8 +523,8 @@ class Compiler:
         self.error=False
     def ana2(self,text,codes,VarPos={},prefix=""):
         state=[(text,codes,VarPos,prefix)]
-        ans_code=""
-        area_tree=varea(None)
+        ans_code=[]
+        area_tree=varea(None,True,"Main")
         t=y_token(type=token_type.structure)
         t.name="int"
         t.size=1
@@ -524,25 +534,26 @@ class Compiler:
         area_tree.append_var(t)
         while len(state)!=0:
             (n_text,n_codes,n_VarPos,n_prefix)=state[0]
-            print(f"编译进度:{100-100*len(n_text)/len(text):.2f}%")
+            print(f"解析进度:{100-100*len(n_text)/len(text):.2f}%")
             state=state[1:]
             if(n_text==""):
                 ans_code=n_codes
                 break
             single_succ=""
+            r_area_tree=copy.deepcopy(area_tree)
             for name,sentence in Compoment.Cs.items():
                 if(sentence.no_start==True): continue
-                succ,textc,code,VarPos,r_oplist,logs1=sentence.Rrcognize(n_text,n_VarPos,area_tree,"",n_prefix+"   ")
+                succ,textc,code,VarPos,r_oplist,logs1,b_area_tree=sentence.Rrcognize(n_text,n_VarPos,r_area_tree,"",n_prefix+"   ")
                 if(succ==True):
                     state.append((textc,n_codes+code,VarPos,"   "+prefix))
                     single_succ=name
+                    area_tree=b_area_tree
                     break
-                # else:
-                #     assert(textc==n_text)
             if(single_succ==""):
                 print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
             else:
                 print("解析成功:",single_succ,"剩余:",textc if len(textc)<50 else textc[:50]+"...")
+        pass
         return ans_code
     def ana(self,text,codes,VarPos={},prefix=""): #这里必须有个递归,可能符合多种情况
         r_logs=""
@@ -613,9 +624,9 @@ if __name__=="__main__":
     preprocessed_code=d.process(content)
     code=a.Complie_file(preprocessed_code)
     print(code)
-    code=c.process(code)
-    with open("IR.txt", 'w', encoding='utf-8') as file:
-        file.write(code)
-    b.Run_from_code(code.split("\n"))
+    # code=c.process(code)
+    # with open("IR.txt", 'w', encoding='utf-8') as file:
+    #     file.write(code)
+    #b.Run_from_code(code.split("\n"))
 
 

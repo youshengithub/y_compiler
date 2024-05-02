@@ -45,8 +45,17 @@ class Preprocesser:
                     line=line.replace(k,v)
                 code+=line+"\n"
         return code
+    def remove_spaces_outside_quotes(self,text):#删除不在引号的空格
+        in_quotes = False
+        result = []
+        for char in text:
+            if char == '"':
+                in_quotes = not in_quotes
+            if char != ' ' or in_quotes:
+                result.append(char)
+        return ''.join(result)
     def process_space(self,text): #这样处理会失去边界定义需要换一条句子dim-> 表示 to这个怎么样 我觉得还行
-        return text.replace('\n', '').replace(' ', '').replace('\t', '')
+        return self.remove_spaces_outside_quotes(text.replace('\n', '').replace('\t', ''))
     def process(self,text):#处理预处理器命令#
         text=self.process_include(text)
         text=self.process_define(text)
