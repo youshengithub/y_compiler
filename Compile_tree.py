@@ -7,7 +7,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
             var=y_token.trans_var(oplist[0])
             base=0
             #ESP的位置用于存储temp变量 #找到变量所在的域 查看起始位置
-            code+="MOV EBX 0\n"
+            code+="MOV EAX 0\n"
             for id,i in enumerate(var):
                 if(id==0):
                     find_var=area_tree.find_token(i[0]) #看一看是啥子类型
@@ -32,7 +32,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
                     print("维度不匹配 ",oplist[0],"--->",i[0]," 变量原始维度:",len(find_var.muti_dimension),"变量引用维度:",len(i)-1)
                     assert(1==0)
                 base=find_var.start_pos
-                if(base!=0): code+="ADD EBX "+str(base)+"\n"#加上基地址
+                if(base!=0): code+="ADD EAX "+str(base)+"\n"#加上基地址
                 accumulate_demension=[]
                 current=1
                 for demension in reversed(find_var.muti_dimension):
@@ -45,7 +45,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
                         if(int(i[index+1])>find_var.muti_dimension[index]): #算了 不想去判断:
                             print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[i],"变量引用维度:",int(i[index+1]))
                             assert(1==0)
-                        code+="MOV EAX "+i[index+1]+"\n"
+                        code+="MOV EBX "+i[index+1]+"\n"
                     else:
                         find_var=area_tree.find_token(i[index+1]) 
                         if(find_var==None):
@@ -54,19 +54,17 @@ def Complie(name,rule,oplist,codelist,area_tree):
                         elif(find_var.type!="int"):
                             print("下标只能为int",oplist[0],"--->",i[index+1])
                             assert(1==0)
-                        code+="MOV EAX $"+str(find_var.start_pos)+"\n"
-                    code+="MUL EAX "+str(accumulate_demension[index])+"\n"
-                    code+="ADD EBX EAX\n"
-                        #寻找到变量位置                 
-                #最后 EAX就是变量的位置！ EBX为左值 EAX为右值
-            oplist.clear()
-            oplist.append("EBX")  
-    elif(name=="OPN"):
+                        code+="MOV EBX $"+str(find_var.start_pos)+"\n"
+                    code+="MUL EBX "+str(accumulate_demension[index])+"\n"
+                    code+="ADD EAX EBX\n" 
+    elif(name=="OPN"):#保证EAX里面必须是地址！ 这样才能统一安排撒！
         if(rule=="$CONST$"):
+            code+="NOP\n" #啥也不干，占位置用的
             pass
-        elif(rule=="$VAR$"):
+        elif(rule=="$VAR$"):#相当于$EAX 判断一下oplist里面是不是real 就知道采用哪种方案了
             pass
         elif(rule=="($OPN$)"):
+            for i in codelist[0]:code+=i
             pass
         pass    
     elif(name=="TOKEN"):#不需要对其进行修正 
@@ -234,12 +232,16 @@ def Complie(name,rule,oplist,codelist,area_tree):
             pass
         pass
     elif(name=="EQUAL"):
-        #可能会有code针对左边的地方进行计算！
+        #可能会有code针对左边的地方进行计算！#需要判断长度 #先不判断左右两边的类型 #先把左边的长度拿起来
+        #问题有点严重了！ 如果是op的话两边都是存到某个区域才行
+        find_var=area_tree.find_token(oplist[0])
+        assert(find_var!=None)
+        length=find_var.size
         if(rule=="$VAR$=$OPN$"):
-            code="MOV "+str(oplist[0]) +" "+str(oplist[1])+"\n"
+            code=f'MOV {oplist[0]} {oplist[1]},{length}\n'
         elif(rule=="$VAR$=$OP$"):   
             code=codelist[0]
-            code+= "MOV "+str(oplist[0])  + " EAX\n"
+            code+= f'MOV {oplist[0]} EAX,{length}\n'
         elif(rule=="$SETP$=$OPN$"):  #这里可能会有点问题 
             for i in codelist: code+=i 
             code+="POP EBX\n"

@@ -1,6 +1,6 @@
 #IR支持22种指令
 #ALLOC
-#MOV
+#MOV 后面可接长度
 #ADD
 #SUB
 #MUL
