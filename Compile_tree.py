@@ -1,55 +1,81 @@
-import re,itertools,copy
+import re
 from token_ana import *
 def Complie(name,rule,oplist,codelist,area_tree):
     code=""
-    #return code
     if(name=="VAR"): 
-        if(oplist[0]!="EAX"):#
+        if not oplist[0] in ["EAX","EBX","ESP","EBP","EIP","EFG","ETP"]:
             var=y_token.trans_var(oplist[0])
             base=0
-            #ESP的位置用于存储temp变量
-            for i in var:
-                find_var=area_tree.find_token(i[0]) #看一看是啥子类型
-                base=find_var.start_pos
+            #ESP的位置用于存储temp变量 #找到变量所在的域 查看起始位置
+            code+="MOV EBX 0\n"
+            for id,i in enumerate(var):
+                if(id==0):
+                    find_var=area_tree.find_token(i[0]) #看一看是啥子类型
+                else:#好像就是find_var不一样
+                    find_flag=False
+                    for var in find_type.vars:
+                        if(var.name==i[0]):
+                            find_var=var
+                            find_flag=True
+                            break
+                    if not find_flag:
+                        print(f"类型{find_type.name}不包含{i[0]}变量")
+                        assert(1==0)
+                
                 if(find_var==None):
                     print("变量未定义",oplist[0],"--->",i[0])
                     assert(1==0)
+                
+                find_type=area_tree.find_token(find_var.type)
+                assert(find_type!=None)
                 if(len(i[1:])!=len(find_var.muti_dimension)):
                     print("维度不匹配 ",oplist[0],"--->",i[0]," 变量原始维度:",len(find_var.muti_dimension),"变量引用维度:",len(i)-1)
                     assert(1==0)
-                code+="MOV EAX "+str(base)+"\n"#载入0号位置
+                base=find_var.start_pos
+                if(base!=0): code+="ADD EBX "+str(base)+"\n"#加上基地址
                 accumulate_demension=[]
                 current=1
                 for demension in reversed(find_var.muti_dimension):
                     accumulate_demension.append(current)
                     current*=demension
-                accumulate_demension=list(reversed(accumulate_demension))
+                accumulate_demension=[i*find_type.size for  i  in reversed(accumulate_demension)] #对齐进行修正 计算正确的大小
                 for index in range(len(find_var.muti_dimension)) :
                     #需要判断是j是数字还是变量
                     if(i[index+1].isdigit()):
                         if(int(i[index+1])>find_var.muti_dimension[index]): #算了 不想去判断:
                             print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[i],"变量引用维度:",int(i[index+1]))
                             assert(1==0)
-                        code+="MOV EBX "+i[index+1]+"\n"
+                        code+="MOV EAX "+i[index+1]+"\n"
                     else:
                         find_var=area_tree.find_token(i[index+1]) 
                         if(find_var==None):
                             print("变量未定义",oplist[0],"--->",i[index+1])
                             assert(1==0)
-                        code+="MOV EBX "+str(find_var.start_pos)+"\n"
-                    code+="MUL EBX "+str(accumulate_demension[index])+"\n"
-                    code+="ADD EAX EBX\n"
+                        elif(find_var.type!="int"):
+                            print("下标只能为int",oplist[0],"--->",i[index+1])
+                            assert(1==0)
+                        code+="MOV EAX $"+str(find_var.start_pos)+"\n"
+                    code+="MUL EAX "+str(accumulate_demension[index])+"\n"
+                    code+="ADD EBX EAX\n"
                         #寻找到变量位置                 
-                #最后 EAX就是变量的位置！
-                oplist.clear()
-                oplist.append("EAX")   
-    elif(name=="TOKEN"): #注意到有些token是
-        #看一看到底是哪一个token  
+                #最后 EAX就是变量的位置！ EBX为左值 EAX为右值
+            oplist.clear()
+            oplist.append("EBX")  
+    elif(name=="OPN"):
+        if(rule=="$CONST$"):
+            pass
+        elif(rule=="$VAR$"):
+            pass
+        elif(rule=="($OPN$)"):
+            pass
+        pass    
+    elif(name=="TOKEN"):#不需要对其进行修正 
         pass
     elif(name=="CONST"):
         pass
     elif(name=="AREA"):
         for i in codelist:code+=i
+        if(rule=="$AREA_S$$AREA_E$"): code+="NOPs\n"
     elif(name=="REGS"):
         pass
     elif(name=="DIM"): #这里要产生巨变！
@@ -60,27 +86,25 @@ def Complie(name,rule,oplist,codelist,area_tree):
         for i in var[1:]: num*=int(i)
         find_type=area_tree.find_token(type)
         # find_var=area_tree.find_token(var[0])
-        # # if(find_var!=None):
-        # #     print("重定义符号")
-        # #     assert(1==0)
+        # if(find_var!=None):
+        #     print("重定义符号",var[0])
+        #     assert(1==0)
         if(find_type==None):
             print("编译出错,类型未定义")
             assert("1==0")
         if(rule=="$TYPE$->$TOKEN$"): #进行解析
-            
             start_pos=area_tree.clac_current_pos()
             t=y_token()
             t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
             area_tree.append_var(t,t.size) #只有变量才会分配区域大小
-            code="ALLOC "+str(t.size)+"\n" #
+            code="ALLOC "+str(t.size)+"//"+type+"\n" #
         elif(rule=="$TYPE$->$TOKEN$=$STRING$"):
-            pass #oplist[0]是var oplist[1]是strig
             assert(type=="int" or type=="double")
             string=oplist[2]
             length=num
             if(length<len(string)):
                 length=len(string)
-            code="ALLOC "+str(length)+"\n"  
+            code="ALLOC "+str(length)+"//"+type+"\n"  
             base=str(area_tree.clac_current_pos()) 
             t=y_token()
             t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
@@ -309,6 +333,14 @@ def Complie(name,rule,oplist,codelist,area_tree):
         code="JMP "+str(code.count("\n")+1)+"\n"+code
         code="ALLOC @"+oplist[1]+"\n"+code
         area_tree=area_tree.father
+        #在codelist[0]里面解析double
+        t=y_token()
+        par=[]
+        for i in codelist[0].split("\n"):
+            if(i!="" and len(i.split("//"))==2):
+                par.append(i.split("//")[1])  
+        t.set_as_function(oplist[0],oplist[1],par)
+        area_tree.append_var(t)
         #code=codelist[0] #还没处理return问题嘞
         pass
     elif(name=="CALL"):#call 然后eax传入参数！
@@ -336,11 +368,22 @@ def Complie(name,rule,oplist,codelist,area_tree):
         code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
         #然后需要执行跳转！
         pass
-    elif(name=="AREA"):
-        #在这里分配作用域
+    # elif(name=="AREA_S"):
+    #     sub_area=area_tree.new_area(False,"None")
+    #     area_tree=sub_area#创建顶级域 在AREA的时候恢复顶级域        
+    #     #在这里分配作用域
+    #     pass
+    # elif(name=="AREA_E"):
+    #     area_tree=area_tree.father
+    #     #在这里分配作用域
+    #     pass
+    elif(name=="tPAR"):#这里是
+        for i in codelist: code+=i
         pass
     elif(name=="PAR"):#这里是形参
         #code="SUB EBP 1\n" #不太需要动EBP
+        for i in codelist: code+=i
+        code+="NOP\n"
         pass
     elif(name=="ARG"): #这里是call的实参  只能使用EAX了 但是我又需要计算op op的值必须要存在eax里面
         #可以使用EAX 但是在算数的时候可能会使用任意参数啊！ 不要把EBX算数寄存器拿来用作控制！
@@ -369,10 +412,20 @@ def Complie(name,rule,oplist,codelist,area_tree):
     elif(name=="TYPE"):
         pass
     elif(name=="STRUCTURE"):
-        area_tree=area_tree.father
         t=y_token()
-        t.set_as_structure(oplist[0],1,[],[])
-        area_tree.append_var(t)
+        func=[]
+        vars=[]
+        struture=[]
+        for i in area_tree.vars:
+            if(i.type==token_type.function): func.append(i)
+            elif(i.type==token_type.structure): struture.append(i)
+            else: vars.append(i)
+        t.set_as_structure(oplist[0],area_tree.clac_current_pos(),func,vars)
+        area_tree=area_tree.father
+        if(area_tree.find_token(t.name)!=None):
+            print(t.name,"结构体已经被定义")
+            assert(1==0)
+        area_tree.append_var(t)#判断要不要插入这个区域 如果要插入的话 判断是不
         
     elif(name=="ASM"):
         code+=oplist[0].replace("\\n","\n")

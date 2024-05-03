@@ -1,5 +1,6 @@
 double->tad[1][2][3][4];
-tad[1][1][1][1]=0;
+int->hhh;
+tad[1][1][1][hhh]=0;
 double--max(double->a,double->b){
     if(a>b){
         return a;
@@ -25,7 +26,7 @@ double--print_int(double->a){
             a=a*1;
         }
         double->res[30];
-        double->length;
+        int->length;
         length=0;
         while(a!=0){
             res[length]=(a%10)+48;

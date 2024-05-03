@@ -23,7 +23,9 @@ IN:in():NO_START#
 DIM:$TYPE$->$TOKEN$=$STRING$ # $TYPE$->$TOKEN$:REPEAT# NO_START# 
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$># :NO_START# 
 SENTENCE:$CALL$; # $JUDGE$;# $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$;# $DIM$; #  $RETURN$; # $FUNC$<;|> # $ASM$; :REPEAT# 
-AREA:{$SENTENCE$}:# 
+AREA_S:{:NO_START
+AREA_E:}:NO_START
+AREA:$AREA_S$$SENTENCE$$AREA_E$ # $AREA_S$$AREA_E$:# 
 JUDGE:$OPN$==$OPN$# $OPN$>$OPN$# $OPN$<$OPN$# $OPN$!=$OPN$# $OPN$<=$OPN$# $OPN$>=$OPN$# ($JUDGE$)# $JUDGE$&&$JUDGE$# $JUDGE$||$JUDGE$# :
 IF:if($JUDGE$)$AREA$<else$AREA$|># :
 DO:do$AREA$while($JUDGE$)# :

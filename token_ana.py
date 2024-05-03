@@ -5,13 +5,17 @@ class token_type(Enum):
     variable=2
     structure=3
 class y_token:
-    def __init__(self,type=token_type.function,name=""):
+    def __init__(self,type=token_type.function,name="",size=0):
         self.type=type
         self.name=name
-    def set_as_function(self,name,paras=[]):
+        self.size=size
+        self.functions=[]
+        self.vars=[]
+    def set_as_function(self,return_types,name,paras=[]):
         self.type=token_type.function
         self.paras=paras
         self.name=name
+        self.return_types=return_types
     def set_as_variable(self,name,size,type,start_pos,muti_dimension=[]):
         self.type=token_type.variable
         self.name=name
@@ -23,7 +27,7 @@ class y_token:
         self.type=token_type.structure
         self.size=size
         self.name=name
-        self.fuctions=functions
+        self.functions=functions
         self.vars=vars
     def get_type(self):
         return self.type
@@ -34,7 +38,6 @@ class y_token:
         for i in infos:
             ans.append(i.replace(']', ''))
         return ans
-        pass
     @staticmethod
     def trans_var(var):
         tokens=var.split(".")
@@ -43,7 +46,18 @@ class y_token:
             ans.append(y_token.trans_token(i))
         return ans
     def __str__(self):
-        ans=f'token名:{self.name},类型:{self.type}\n'
+        ans=f'token名:{self.name},类型:{self.type}'
+        if(self.type==token_type.structure):
+            ans+=f'拥有函数:{self.functions},拥有变量:{self.vars}'
+            pass
+        elif(self.type==token_type.variable):
+            
+            pass
+        elif(self.type==token_type.function):
+            ans+=f'返回类型:{self.return_types},参数类型:{self.paras}'
+        else:
+            ans+=f'大小:{self.size},起始位置:{self.start_pos},维度{self.muti_dimension}'
+            pass
         return ans
     def __repr__(self):
         return self.__str__()
@@ -79,15 +93,28 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
         if self.vars!=[]:
             ans+=" "*self.level+"--展示变量中--\n"
             for i in self.vars:
-                ans+=" "*(self.level+1)+str(i)
+                ans+=" "*(self.level+1)+str(i)+"\n"
         if self.areas!=[]:
             ans+=" "*self.level+"--展示区域中--\n"
             for i in self.areas:
                 ans+=" "*self.level+str(i)
-        return ans+"\n"
+        return ans
     def __repr__(self):
         return self.__str__()
-    def find_token(self,name,area_name="Main"):#沿树寻找
+    def find_area(self,area_name):#
+        bfs=[]
+        bfs.append(self.father)
+        bfs.append(self)
+        find_ans=None
+        while len(bfs)!=0:
+            tmp=bfs.pop()
+            if(tmp==None): continue
+            bfs.append(tmp.father)
+            if tmp.name==area_name:
+                find_ans=tmp
+                break
+        return find_ans
+    def find_token(self,name):#沿树寻找
         bfs=[]
         bfs.append(self.father)
         bfs.append(self)

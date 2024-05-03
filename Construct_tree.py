@@ -1,6 +1,5 @@
-import re,itertools,copy
+import re,itertools
 from runner import Runner
-# 打开文本文件
 from token_ana import *
 from postprocesser import Postprocesser
 from preprocesser import Preprocesser
@@ -14,11 +13,6 @@ class Compoment:
         self.repeat=repeat_
         self.no_start=no_start
         self.is_keywords=is_keywords
-    def handelP(self,rule,text): 
-        next_index = rule[1:].find('$')
-        if(next_index==-1): return False
-        name=rule[1:next_index+1]
-        return Compoment.Cs[name].Rrcognize(text)
     def HandleR(self,rule,text): 
         text_c=text
         oplist=[]
@@ -38,7 +32,7 @@ class Compoment:
                         if match_text in ["struct","class","void","in","asm","if","do","while","for","out","else","func","return","struct","int","double","continue"] :
                             return False,text_c,oplist,codelist
                         oplist.append(match_text)
-                    elif(self.name=="CONST"):
+                    elif(self.name=="CONST" ):
                         oplist.append(match.group(0))
                     elif(self.name=="STRING"): #需要有一个table 
                         oplist.append(match.group(0)[1:-1])
@@ -54,7 +48,10 @@ class Compoment:
                     #if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
                     return False,text_c,oplist,codelist
             elif(rule.startswith("$")):
-                succ,text,code,r_oplist=self.handelP(rule,text) #消除掉rule部分 并且这里的code 没有用上！
+                next_index = rule[1:].find('$')
+                if(next_index==-1): return False
+                name=rule[1:next_index+1]
+                succ,text,code,r_oplist=Compoment.Cs[name].Rrcognize(text) #消除掉rule部分 并且这里的code 没有用上！
                 if(succ==True):
                     dollar_index = rule[1:].find('$')
                     rule=rule[2+dollar_index:] 
@@ -99,15 +96,14 @@ class Compoment:
                     flag=True
                     repeat=self.repeat
                     r_oplist=oplist
-                    compile_txt=textc[0:len(textc)-len(text)]
-                    compiled_code=[(self.name,rule,oplist,code_list,compile_txt )]
+                    compiled_code=[(self.name,rule,oplist,code_list,textc[0:len(textc)-len(text)] )]
                     r_code+=compiled_code #+" Rule: "+rule
                     break   #这里仿佛也不应该call;最好是用 
         return flag,text,r_code,r_oplist
 class Compiler:
     #VARPos=环境
     def __init__(self) -> None:
-        self.error=False
+        pass
     def ana2(self,text,codes=[]):
         state=[(text,codes)]
         ans_code=[]
@@ -116,8 +112,7 @@ class Compiler:
             print(f"解析进度:{100-100*len(n_text)/len(text):.2f}%")
             state=state[1:]
             ans_code=n_codes
-            if(n_text==""):
-                break
+            if(n_text==""): break
             single_succ=""
             for name,sentence in Compoment.Cs.items():
                 if(sentence.no_start==True): continue
@@ -126,10 +121,8 @@ class Compiler:
                     state.append((textc,n_codes+code))
                     single_succ=name
                     break
-            if(single_succ==""):
-                print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
-        return ans_code
-
+            if(single_succ==""):    print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
+        return single_succ!="",ans_code
     def revise_config(self,original_str):
         pattern = r"<(.*?)>"
         matches = re.findall(pattern, original_str)
@@ -146,6 +139,7 @@ class Compiler:
         with open(file_path, 'r') as file: #构造词类
             for line in file:
                 line=line.replace(' ', '')
+                if(line==""):continue
                 temp=line.split(":")
                 name=temp[0]
                 configs=temp[1].split("#")
@@ -158,12 +152,12 @@ class Compiler:
                 print(name,revised_configs)
                 Compoment.Cs[name]=Compoment (name,revised_configs,"REPEAT" in attribute, "NO_START" in attribute,"IS_KEYWORDS" in attribute)  
     def Complie_file(self,text):
-        self.error=False
-        return self.real_compile(self.ana2(text))
-    def cut_str(self,i):
-        if(len(i)<50): return i
-        else: return i[0:50]+"..."
-    def show(self,node,code,prefix=""):
+        state,codelists=self.ana2(text)
+        return state,self.real_compile(codelists)
+    def cut_str(self,i,limits=50):
+        if(len(i)<limits): return i
+        else: return i[:limits]+"..."
+    def show_and_compile(self,node,code,prefix=""):
         codelists=[]
         if(isinstance(node,tuple)):
             name=node[0]
@@ -171,30 +165,28 @@ class Compiler:
             oplist=node[2]
             code_list=node[3]
             source_text=node[4]
-            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(source_text))
             if(code_list!=[]):
                 for i in code_list:
+                    t_code=""
                     for j in i:
-                        b_code=self.show(j,"",prefix+" ")
-                        codelists.append(b_code)
+                        b_code=self.show_and_compile(j,"",prefix+" ")
+                        t_code+=b_code
+                    if(t_code!=""):
+                        codelists.append(t_code)
                 code_list=codelists
             b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
+            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
             code+=b_code
             return code
         else:   assert(1==0)
     def real_compile(self,c_lists):
         area_tree=varea(None,True,"Main")
-        t=y_token(type=token_type.structure)
-        t.name="int"
-        t.size=1
-        area_tree.append_var(copy.deepcopy(t))
-        t.name="double"
-        t.size=1
-        area_tree.append_var(t)
+        area_tree.append_var(y_token(token_type.structure,"int",1))
+        area_tree.append_var(y_token(token_type.structure,"double",1))
         code=""
         self.area_tree=area_tree
         for i in c_lists:
-            b_code=self.show(i,"")
+            b_code=self.show_and_compile(i,"")
             code+=b_code
         print(area_tree)
         return code
@@ -207,8 +199,8 @@ if __name__=="__main__":
     with open("code.txt", 'r', encoding='utf-8') as file:
         content = file.read()
     preprocessed_code=d.process(content)
-    code=a.Complie_file(preprocessed_code)
-    print(code)
+    state,code=a.Complie_file(preprocessed_code)
+    if state:print(code)
     # code=c.process(code)
     # with open("IR.txt", 'w', encoding='utf-8') as file:
     #     file.write(code)
