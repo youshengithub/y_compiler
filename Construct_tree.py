@@ -153,7 +153,10 @@ class Compiler:
                 Compoment.Cs[name]=Compoment (name,revised_configs,"REPEAT" in attribute, "NO_START" in attribute,"IS_KEYWORDS" in attribute)  
     def Complie_file(self,text):
         state,codelists=self.ana2(text)
-        return state,self.real_compile(codelists)
+        if(state):
+            return state,self.real_compile(codelists)
+        else:
+            return False,""
     def cut_str(self,i,limits=50):
         if(len(i)<limits): return i
         else: return i[:limits]+"..."
@@ -175,7 +178,7 @@ class Compiler:
                         codelists.append(t_code)
                 code_list=codelists
             b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
-            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
+            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
             code+=b_code
             return code
         else:   assert(1==0)

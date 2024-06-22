@@ -1,6 +1,6 @@
 KEYWORDS: @^<struct|class|void|in|if|do|while|for|out|else|func|return|struct|int|double|continue|asm>@ : NO_START
 TYPE:@^double@ # @^int@ # @^void@ # $TOKEN$:NO_START# 
-STRUCTURE:<struct|class>$FUNCNAME$$AREA$: # 
+STRUCTURE:<struct|class>$EMPTY$$FUNCNAME$$AREA$: # 
 TOKEN:@(^[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*@: NO_START# # IS_KEYWORDS 
 REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# IS_KEYWORDS 
 VAR: $REGS$  # @((^(?!struct$)(?!class)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!else$)(?!func)(?!return)(?!struct$)(?!int$)(?!asm$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!asm$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ :NO_START# 
@@ -20,9 +20,9 @@ MOD:$<OP|OPN>$%$<OP|OPN>$:NO_START#
 GETP:&$VAR$:NO_START# 
 SETP:*$<OP|OPN>$:NO_START# 
 IN:in():NO_START# 
-DIM:$TYPE$->$TOKEN$=$STRING$ # $TYPE$->$TOKEN$:REPEAT# NO_START# 
+DIM:$TYPE$$EMPTY$$TOKEN$=$STRING$ # $TYPE$$EMPTY$$TOKEN$:REPEAT# NO_START# 
 EQUAL:<$VAR$|$SETP$>=<$OP$|$OPN$># :NO_START# 
-SENTENCE:$CALL$; # $JUDGE$;# $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$;# $DIM$; #  $RETURN$; # $FUNC$<;|> # $ASM$; :REPEAT# 
+SENTENCE:$CALL$; # $JUDGE$;# $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$; # $FUNC$<;|> # $DIM$; #  $RETURN$; # $ASM$; :REPEAT# 
 AREA_S:{:NO_START
 AREA_E:}:NO_START
 AREA:$AREA_S$$SENTENCE$$AREA_E$ # $AREA_S$$AREA_E$:# 
@@ -32,14 +32,15 @@ DO:do$AREA$while($JUDGE$)# :
 WHILE:while($JUDGE$)$AREA$# :
 FOR:for($EQUAL$;$JUDGE$;$EQUAL$)$AREA$ :
 PRINT:out($OPN$)# :
-CALL:$TOKEN$(<$ARG$|>):
+CALL:$TOKEN$.$CALL$ # $TOKEN$(<$ARG$|>):
 ARG:$tARG$ # :NO_START# REPEAT# 
 tARG:$OP$,$tARG$ #  $OPN$,$tARG$  # $OP$ # $OPN$  :NO_START#
 tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
 PAR:$tPAR$:
 FUNCNAME:$TOKEN$:NO_START# 
-FUNC:$TYPE$--$FUNCNAME$(<$PAR$|>)$AREA$:
-RETURN:return<$OP$|$OPN$|>:NO_START#
+FUNC:$TYPE$$EMPTY$$FUNCNAME$(<$PAR$|>)$AREA$:
+RETURN:return$EMPTY$<$OP$|$OPN$|>:NO_START#
 OPS:@^+@ # @^-@ # @^*@ # @^/@ # @^&@ # @^|@ # @^!@ # @^^@ # @^%@ :NO_START# 
 OPERATOR:$TYPE$--$OPS$--$FUNCNAME$(<$PAR$|>)$AREA$:
 ASM:asm($STRING$): NO_START
+EMPTY:@^\s+@:NO_START

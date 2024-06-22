@@ -1,16 +1,22 @@
 #此数据结构用于记录各个token的属性
 from enum import Enum
+
+token_and_area_id=0
 class token_type(Enum):
     function=1
     variable=2
     structure=3
 class y_token:
     def __init__(self,type=token_type.function,name="",size=0):
+        global token_and_area_id
+        token_and_area_id+=1
+        self.id=token_and_area_id
         self.type=type
         self.name=name
         self.size=size
         self.functions=[]
         self.vars=[]
+        
     def set_as_function(self,return_types,name,paras=[]):
         self.type=token_type.function
         self.paras=paras
@@ -46,7 +52,7 @@ class y_token:
             ans.append(y_token.trans_token(i))
         return ans
     def __str__(self):
-        ans=f'token名:{self.name},类型:{self.type}'
+        ans=f'ID:{self.id},token名:{self.name},类型:{self.type}'
         if(self.type==token_type.structure):
             ans+=f'拥有函数:{self.functions},拥有变量:{self.vars}'
             pass
@@ -63,6 +69,9 @@ class y_token:
         return self.__str__()
 class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然需要用于操作数 每当有一个{}就需要实现一个添加一个新的作用域
     def __init__(self,father,is_top_area=True,name=" ",level=1): 
+        global token_and_area_id
+        token_and_area_id+=1
+        self.id=token_and_area_id#用于标识唯一id
         self.father=father
         self.name=name
         self.is_top_area=is_top_area
@@ -89,7 +98,7 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
     def clac_current_pos(self):
         return self.find_top_father().current_pos
     def __str__(self):
-        ans=" "*self.level+f'层级:{self.level},顶级域:{self.is_top_area},区域名{self.name},token数:{len(self.vars)},区域数:{len(self.areas)}\n'
+        ans=" "*self.level+f',ID:{self.id},层级:{self.level},顶级域:{self.is_top_area},区域名{self.name},token数:{len(self.vars)},区域数:{len(self.areas)}\n'
         if self.vars!=[]:
             ans+=" "*self.level+"--展示变量中--\n"
             for i in self.vars:

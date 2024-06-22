@@ -1,3 +1,4 @@
+import re
 class Preprocesser:
     pass
     def process_note(self,text):
@@ -51,11 +52,38 @@ class Preprocesser:
         for char in text:
             if char == '"':
                 in_quotes = not in_quotes
-            if char != ' ' or in_quotes:
+
+            if(char==' ' and in_quotes):
+                result.append('\x00')#占位符
+            else:
                 result.append(char)
         return ''.join(result)
+    def remove_spaces_around_symbols(self,s):
+        result=[]
+        last_char_was_non_alpha_numeric = None
+        
+        for char in s:
+            # 检查当前字符是否为空格
+            if char.isspace():
+                # 如果前一个字符是非字母数字，则跳过此空格
+                if last_char_was_non_alpha_numeric:
+                    continue
+                # 否则，添加空格到结果
+                else:
+                    result.append(char)
+            else:
+                # 非空格字符，直接添加到结果
+                result.append(char)
+                # 更新标志位
+                last_char_was_non_alpha_numeric = not char.isalnum()
+        
+        # 返回处理后的字符串
+        return ''.join(result)
     def process_space(self,text): #这样处理会失去边界定义需要换一条句子dim-> 表示 to这个怎么样 我觉得还行
-        return self.remove_spaces_outside_quotes(text.replace('\n', '').replace('\t', ''))
+        pre=self.remove_spaces_outside_quotes(text.replace('\n', '').replace('\t', ''))
+        next=self.remove_spaces_around_symbols(pre)
+        ans=next.replace('\x00', ' ')
+        return ans
     def process(self,text):#处理预处理器命令#
         text=self.process_include(text)
         text=self.process_define(text)

@@ -1,5 +1,16 @@
 import re
 from token_ana import *
+def call_function():
+    pass
+def process_var(code,op):
+    if(op.isdigit()):
+        return "int","",op
+    else:
+        index=code.rfind('/')
+        if(index==-1):
+            print("var处理错误")
+            assert(1==0)
+        return code[index+1:-1],code,"$EAX"
 def Complie(name,rule,oplist,codelist,area_tree):
     code=""
     if(name=="VAR"): 
@@ -7,7 +18,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
             var=y_token.trans_var(oplist[0])
             base=0
             #ESP的位置用于存储temp变量 #找到变量所在的域 查看起始位置
-            code+="MOV EBX 0\n"
+            code+="MOV EAX 0\n"
             for id,i in enumerate(var):
                 if(id==0):
                     find_var=area_tree.find_token(i[0]) #看一看是啥子类型
@@ -32,7 +43,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
                     print("维度不匹配 ",oplist[0],"--->",i[0]," 变量原始维度:",len(find_var.muti_dimension),"变量引用维度:",len(i)-1)
                     assert(1==0)
                 base=find_var.start_pos
-                if(base!=0): code+="ADD EBX "+str(base)+"\n"#加上基地址
+                if(base!=0): code+="ADD EAX "+str(base)+"\n"#加上基地址
                 accumulate_demension=[]
                 current=1
                 for demension in reversed(find_var.muti_dimension):
@@ -45,7 +56,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
                         if(int(i[index+1])>find_var.muti_dimension[index]): #算了 不想去判断:
                             print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[i],"变量引用维度:",int(i[index+1]))
                             assert(1==0)
-                        code+="MOV EAX "+i[index+1]+"\n"
+                        code+="MOV EBX "+i[index+1]+"\n"
                     else:
                         find_var=area_tree.find_token(i[index+1]) 
                         if(find_var==None):
@@ -54,15 +65,15 @@ def Complie(name,rule,oplist,codelist,area_tree):
                         elif(find_var.type!="int"):
                             print("下标只能为int",oplist[0],"--->",i[index+1])
                             assert(1==0)
-                        code+="MOV EAX $"+str(find_var.start_pos)+"\n"
-                    code+="MUL EAX "+str(accumulate_demension[index])+"\n"
-                    code+="ADD EBX EAX\n"
+                        code+="MOV EBX $"+str(find_var.start_pos)+"\n"
+                    code+="MUL EBX "+str(accumulate_demension[index])+"\n"
+                    code+="ADD EAX EBX\n"
                         #寻找到变量位置                 
                 #最后 EAX就是变量的位置！ EBX为左值 EAX为右值
-            oplist.clear()
-            oplist.append("EBX")  
+            code=code[:-1]+"//"+find_type.name+"\n" #在最后记录一下这个类型的名字方便后面使用 
     elif(name=="OPN"):
         if(rule=="$CONST$"):
+            code+="NOP\n"
             pass
         elif(rule=="$VAR$"):
             pass

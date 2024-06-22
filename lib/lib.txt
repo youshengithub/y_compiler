@@ -1,21 +1,21 @@
-double->tad[1][2][3][4];
-int->hhh;
+double tad[1][2][3][4];
+int hhh;
 tad[1][1][1][hhh]=0;
-double--max(double->a,double->b){
+double max(double a,double b){
     if(a>b){
         return a;
     }else{
         return b;
     }
 }
-double--min(double->a,double->b){
+double min(double a,double b){
     if(a<b){
         return b;
     }else{
         return a;
     }
 }
-double--print_int(double->a){
+double print_int(double a){
     if(a==0){
         out(48);
     }else{
@@ -25,8 +25,8 @@ double--print_int(double->a){
         }else{
             a=a*1;
         }
-        double->res[30];
-        int->length;
+        double res[30];
+        int length;
         length=0;
         while(a!=0){
             res[length]=(a%10)+48;
