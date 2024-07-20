@@ -168,6 +168,7 @@ class Compiler:
             oplist=node[2]
             code_list=node[3]
             source_text=node[4]
+            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(source_text))
             if(code_list!=[]):
                 for i in code_list:
                     t_code=""
@@ -177,8 +178,9 @@ class Compiler:
                     if(t_code!=""):
                         codelists.append(t_code)
                 code_list=codelists
-            b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
-            print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
+            b_code=""
+            #b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
+            # print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
             code+=b_code
             return code
         else:   assert(1==0)

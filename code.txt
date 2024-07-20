@@ -9,6 +9,7 @@ class mys{
     }
 }
 mys my_st[3][2];
+myst[2][3].c[2][3].he();
 my_st[1][1].a[2][3]=1;
 double hello(double a1,double b1){
     //out(a1);

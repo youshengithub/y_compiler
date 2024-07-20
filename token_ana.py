@@ -1,6 +1,14 @@
 #此数据结构用于记录各个token的属性
 from enum import Enum
-
+class y_code():
+    def __init__(self):
+        self.return_num=0
+        self.return_type=None
+        self.text=""
+        self.cannot_use_regs=set()
+        pass
+    def concat(self,code):
+        pass
 token_and_area_id=0
 class token_type(Enum):
     function=1
