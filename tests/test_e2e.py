@@ -94,6 +94,17 @@ TEST_CASES = [
     ("t68_nested_struct.y",     "A",    False),
     ("t69_func_call_in_expr.y", "A",    False),
     ("t70_mutual_recursion.y",  "C",    False),
+    # — 算法测试 —
+    ("t71_while_sum.y",         "55",   False),
+    ("t72_dowhile_count.y",     "1",    False),
+    ("t73_nested_for.y",        "9",    False),
+    ("t74_func_fib_iter.y",     "55",   False),
+    ("t75_gcd.y",               "12",   False),
+    ("t76_power.y",             "256",  False),
+    ("t77_abs_val.y",           "42",   False),
+    ("t78_array_reverse.y",     "CBA",  False),
+    ("t79_bubble_sort.y",       "123",  False),
+    ("t80_max_min.y",           "9",    False),
 ]
 
 _devnull = open(os.devnull, 'w')
