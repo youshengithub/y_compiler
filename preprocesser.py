@@ -18,13 +18,16 @@ class Preprocesser:
         for line in lines:
             if(line.startswith("#include")):
                 file_path=line[9:-1]
+                content=""
                 try:
                     with open(file_path, 'r', encoding='utf-8') as file:
                         content = file.read()
                 except FileNotFoundError:
                     print("错误：文件未找到。请检查文件路径是否正确:",file_path)
+                    continue
                 except IOError:
                     print("错误：无法读取文件:",file_path)
+                    continue
                 code+=self.process_include(content)
             else:
                 code+=line+"\n"
@@ -35,10 +38,10 @@ class Preprocesser:
         code=""
         for line in lines:
             if(line.startswith("#define")):
-                defines=line[8:].split(" ")
+                defines=line[len("#define "):].split(" ")
                 tags[defines[0]]=defines[1]
             elif(line.startswith("#undefine")):
-                defines=line[20:].split(" ")
+                defines=line[len("#undefine "):].split(" ")
                 if(defines[0] in tags):
                     del tags[defines[0]]
             else:

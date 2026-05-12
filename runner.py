@@ -163,16 +163,19 @@ class Runner:
                 else:
                     self.memory[self.memory[op1]]= int(op2)
             elif(keywords[0]=="PUSH"):
+                # 正确语义：把值写入 memory[ESP]，再 ESP+=1
+                sp=self.memory[REGS["ESP"]]
                 if(flag1=="pos"):
-                    self.memory[REGS["ESP"]]= int(self.memory[op1])
+                    self.memory[sp]=int(self.memory[op1])
                 else:
-                    self.memory[REGS["ESP"]]= int(op1)
-                self.memory[REGS["ESP"]]+=1
+                    self.memory[sp]=int(op1)
+                self.memory[REGS["ESP"]]=sp+1
             elif(keywords[0]=="POP"):
+                # 正确语义：ESP-=1，目的地 = memory[ESP]
                 assert(flag1=="pos")
-                self.memory[REGS["ESP"]]-=1
-                if(flag1=="pos"):
-                    self.memory[op1]=self.memory[REGS["ESP"]]
+                sp=self.memory[REGS["ESP"]]-1
+                self.memory[REGS["ESP"]]=sp
+                self.memory[op1]=self.memory[sp]
             elif(keywords[0]=="GREATER"):
                 if(flag1=="pos"):
                     if(flag2=="pos"):
@@ -209,6 +212,26 @@ class Runner:
                     else:
                         self.memory[REGS["EFG"]]= op1<op2
                 self.memory[REGS["EFG"]]= not self.memory[REGS["EFG"]]
+            elif(keywords[0]=="LE"):
+                if(flag1=="pos"):
+                    a=self.memory[op1]
+                else:
+                    a=op1
+                if(flag2=="pos"):
+                    b=self.memory[op2]
+                else:
+                    b=op2
+                self.memory[REGS["EFG"]]= not (a<=b)
+            elif(keywords[0]=="GE"):
+                if(flag1=="pos"):
+                    a=self.memory[op1]
+                else:
+                    a=op1
+                if(flag2=="pos"):
+                    b=self.memory[op2]
+                else:
+                    b=op2
+                self.memory[REGS["EFG"]]= not (a>=b)
             elif(keywords[0]=="RF"):
                 self.memory[REGS["EFG"]]= not self.memory[REGS["EFG"]]
             elif(keywords[0]=="JPIF"):

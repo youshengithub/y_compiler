@@ -15,32 +15,35 @@ class token_type(Enum):
     variable=2
     structure=3
 class y_token:
-    def __init__(self,type=token_type.function,name="",size=0):
+    def __init__(self,kind=token_type.function,name="",size=0):
         global token_and_area_id
         token_and_area_id+=1
         self.id=token_and_area_id
-        self.type=type
+        self.kind=kind          # 符号种类：function / variable / structure
+        self.type=None          # 值类型（字符串，如 "int"/"double"/自定义结构名）
         self.name=name
         self.size=size
         self.functions=[]
         self.vars=[]
         
     def set_as_function(self,return_types,name,paras=[]):
-        self.type=token_type.function
+        self.kind=token_type.function
         self.paras=paras
         self.name=name
         self.return_types=return_types
+        self.type=return_types  # 兼容：函数的"值类型"=返回类型
     def set_as_variable(self,name,size,type,start_pos,muti_dimension=[]):
-        self.type=token_type.variable
+        self.kind=token_type.variable
         self.name=name
         self.size=size #记住这里是总大小
-        self.type=type
+        self.type=type  # 值类型，例如 "int"
         self.start_pos=start_pos
         self.muti_dimension=muti_dimension
     def set_as_structure(self,name,size,functions=[],vars=[]):  
-        self.type=token_type.structure
+        self.kind=token_type.structure
         self.size=size
         self.name=name
+        self.type=name  # 结构体的"值类型"就是它自己的名字
         self.functions=functions
         self.vars=vars
     def get_type(self):
@@ -60,17 +63,16 @@ class y_token:
             ans.append(y_token.trans_token(i))
         return ans
     def __str__(self):
-        ans=f'ID:{self.id},token名:{self.name},类型:{self.type}'
-        if(self.type==token_type.structure):
+        ans=f'ID:{self.id},token名:{self.name},种类:{self.kind}'
+        if(self.kind==token_type.structure):
             ans+=f'拥有函数:{self.functions},拥有变量:{self.vars}'
             pass
-        elif(self.type==token_type.variable):
-            
+        elif(self.kind==token_type.variable):
+            ans+=f',值类型:{self.type},大小:{self.size},起始位置:{getattr(self,"start_pos","?")},维度{getattr(self,"muti_dimension",[])}'
             pass
-        elif(self.type==token_type.function):
-            ans+=f'返回类型:{self.return_types},参数类型:{self.paras}'
+        elif(self.kind==token_type.function):
+            ans+=f'返回类型:{self.return_types},参数类型:{getattr(self,"paras",[])}'
         else:
-            ans+=f'大小:{self.size},起始位置:{self.start_pos},维度{self.muti_dimension}'
             pass
         return ans
     def __repr__(self):

@@ -8,7 +8,7 @@
 #include <cctype>
 #include <cstring>
 #include <map>
-enum opcode{ALLOC,MOV,TO,ADD,SUB,MUL,DIV,AND,OR,XOR,MOD,NOT,LEA,SEA,PUSH,POP,GREATER,EQUAL,LESS,RF,JPIF,JPNIF,JMP,OUT,IN};
+enum opcode{ALLOC,MOV,TO,ADD,SUB,MUL,DIV,AND,OR,XOR,MOD,NOT,LEA,SEA,PUSH,POP,GREATER,EQUAL,LESS,LE,GE,RF,JPIF,JPNIF,JMP,OUT,IN};
 std::map<std::string,opcode> string2int{
 {"ALLOC",opcode::ALLOC},
 {"MOV",opcode::MOV},
@@ -29,6 +29,8 @@ std::map<std::string,opcode> string2int{
 {"GREATER",opcode::GREATER},
 {"EQUAL",opcode::EQUAL},
 {"LESS",opcode::LESS},
+{"LE",opcode::LE},
+{"GE",opcode::GE},
 {"RF",opcode::RF},
 {"JPIF",opcode::JPIF},
 {"JPNIF",opcode::JPNIF},
@@ -371,6 +373,21 @@ public:
                     }
                     memory[reg_id::EFG]=!memory[reg_id::EFG];
                     break;                
+
+                case LE:
+                    {
+                        long long a = (flag1==type_op::POS) ? memory[op1] : op1;
+                        long long b = (flag2==type_op::POS) ? memory[op2] : op2;
+                        memory[reg_id::EFG] = !(a<=b);
+                    }
+                    break;
+                case GE:
+                    {
+                        long long a = (flag1==type_op::POS) ? memory[op1] : op1;
+                        long long b = (flag2==type_op::POS) ? memory[op2] : op2;
+                        memory[reg_id::EFG] = !(a>=b);
+                    }
+                    break;
 
                 case RF:
                     memory[reg_id::EFG]=!memory[reg_id::EFG];

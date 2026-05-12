@@ -11,10 +11,37 @@ def process_var(code,op):
             print("var处理错误")
             assert(1==0)
         return code[index+1:-1],code,"$EAX"
+def _addr(area_tree, op):
+    """把 oplist 的字符串元素翻译为 runner 能识别的操作数。
+    数字、寄存器名、已带 $/%/@ 的串原样返回；裸标识符若能在符号表里查到变量，则用 $start_pos% 表示绝对地址。"""
+    s = str(op)
+    if s == "" or s.isdigit():
+        return s
+    # 负数常量
+    if len(s) > 1 and s[0] == '-' and s[1:].isdigit():
+        return s
+    # 已经是寄存器名 / $.. / %.. / @.. 之一
+    if s in ("EAX", "EBX", "ESP", "EBP", "EIP", "EFG", "ETP"):
+        return s
+    if s[0] in ("$", "%", "@"):
+        return s
+    # 试图在符号表里找
+    try:
+        tk = area_tree.find_token(s)
+    except Exception:
+        tk = None
+    if tk is not None and hasattr(tk, "start_pos"):
+        return "$" + str(tk.start_pos)
+    return s
+
 def Complie(name,rule,oplist,codelist,area_tree):
     code=""
     if(name=="VAR"): 
         if not oplist[0] in ["EAX","EBX","ESP","EBP","EIP","EFG","ETP"]:
+            # 简单标量（无下标 / 字段访问）不需要在 VAR 阶段生成代码——
+            # EQUAL/PRINT/算术节点会通过 _addr() 直接把名字翻译为 $start_pos。
+            if "[" not in oplist[0] and "." not in oplist[0]:
+                return code, area_tree
             var=y_token.trans_var(oplist[0])
             base=0
             #ESP的位置用于存储temp变量 #找到变量所在的域 查看起始位置
@@ -53,8 +80,8 @@ def Complie(name,rule,oplist,codelist,area_tree):
                 for index in range(len(find_var.muti_dimension)) :
                     #需要判断是j是数字还是变量
                     if(i[index+1].isdigit()):
-                        if(int(i[index+1])>find_var.muti_dimension[index]): #算了 不想去判断:
-                            print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[i],"变量引用维度:",int(i[index+1]))
+                        if(int(i[index+1])>=find_var.muti_dimension[index]): #合法下标 0..dim-1
+                            print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[index],"变量引用维度:",int(i[index+1]))
                             assert(1==0)
                         code+="MOV EBX "+i[index+1]+"\n"
                     else:
@@ -103,13 +130,13 @@ def Complie(name,rule,oplist,codelist,area_tree):
         if(find_type==None):
             print("编译出错,类型未定义")
             assert("1==0")
-        if(rule=="$TYPE$->$TOKEN$"): #进行解析
+        if(rule=="$TYPE$$EMPTY$$TOKEN$"): #进行解析
             start_pos=area_tree.clac_current_pos()
             t=y_token()
             t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
             area_tree.append_var(t,t.size) #只有变量才会分配区域大小
             code="ALLOC "+str(t.size)+"//"+type+"\n" #
-        elif(rule=="$TYPE$->$TOKEN$=$STRING$"):
+        elif(rule=="$TYPE$$EMPTY$$TOKEN$=$STRING$"):
             assert(type=="int" or type=="double")
             string=oplist[2]
             length=num
@@ -130,14 +157,14 @@ def Complie(name,rule,oplist,codelist,area_tree):
         pass
     elif(name=="ADD"):
         if(rule=="$OPN$+$OPN$"):
-            code="MOV EAX "+str(oplist[0])+"\n"
-            code+="ADD EAX "+str(oplist[1])+"\n"
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+="ADD EAX "+_addr(area_tree,oplist[1])+"\n"
         elif(rule=="$OPN$+$OP$"):
             code=codelist[0]
-            code+="ADD EAX "+str(oplist[0])+"\n"
+            code+="ADD EAX "+_addr(area_tree,oplist[0])+"\n"
         elif(rule=="$OP$+$OPN$"):
             code=codelist[0]
-            code+="ADD EAX "+str(oplist[-1])+"\n"
+            code+="ADD EAX "+_addr(area_tree,oplist[-1])+"\n"
         elif(rule=="$OP$+$OP$"):
             code=codelist[1]
             code+="MOV EBX EAX\n"
@@ -147,16 +174,16 @@ def Complie(name,rule,oplist,codelist,area_tree):
             assert(1==0)
     elif(name=="SUB"):
         if(rule=="$OPN$-$OPN$"):
-            code="MOV EAX "+str(oplist[0])+"\n"
-            code+="SUB EAX "+str(oplist[1])+"\n"
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+="SUB EAX "+_addr(area_tree,oplist[1])+"\n"
         elif(rule=="$OPN$-$OP$"):
             code=codelist[0]
-            code+="MOV EBX "+str(oplist[0])+"\n"
+            code+="MOV EBX "+_addr(area_tree,oplist[0])+"\n"
             code+="SUB EBX EAX\n"
             code+="MOV EAX EBX\n"
         elif(rule=="$OP$-$OPN$"):
             code=codelist[0]
-            code+="SUB EAX "+str(oplist[-1])+"\n"
+            code+="SUB EAX "+_addr(area_tree,oplist[-1])+"\n"
         elif(rule=="$OP$-$OP$"):
             code=codelist[1]
             code+="MOV EBX EAX\n"
@@ -166,14 +193,14 @@ def Complie(name,rule,oplist,codelist,area_tree):
             assert(1==0)
     elif(name=="MUL"): #注意到可能会被修正成代码！ op可能会被修正成位置
         if(rule=="$OPN$*$OPN$"):
-            code="MOV EAX "+str(oplist[0])+"\n"
-            code+="MUL EAX "+str(oplist[1])+"\n"
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+="MUL EAX "+_addr(area_tree,oplist[1])+"\n"
         elif(rule=="$OPN$*$OP$"):
             code=codelist[0]
-            code+="MUL EAX "+str(oplist[0])+"\n"
+            code+="MUL EAX "+_addr(area_tree,oplist[0])+"\n"
         elif(rule=="$OP$*$OPN$"):
             code=codelist[0]
-            code+="MUL EAX "+str(oplist[-1])+"\n"
+            code+="MUL EAX "+_addr(area_tree,oplist[-1])+"\n"
         elif(rule=="$OP$*$OP$"):
             code=codelist[1]
             code+="MOV EBX EAX\n"
@@ -183,16 +210,16 @@ def Complie(name,rule,oplist,codelist,area_tree):
             assert(1==0)
     elif(name=="DIV"):
         if(rule=="$OPN$/$OPN$"):
-            code="MOV EAX "+str(oplist[0])+"\n"
-            code+="DIV EAX "+str(oplist[1])+"\n"
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+="DIV EAX "+_addr(area_tree,oplist[1])+"\n"
         elif(rule=="$OPN$/$OP$"):
             code=codelist[0]
-            code+="MOV EBX "+str(oplist[0])+"\n"
+            code+="MOV EBX "+_addr(area_tree,oplist[0])+"\n"
             code+="DIV EBX EAX\n"
             code+="MOV EAX EBX\n"
         elif(rule=="$OP$/$OPN$"):
             code=codelist[0]
-            code+="DIV EAX "+str(oplist[-1])+"\n"
+            code+="DIV EAX "+_addr(area_tree,oplist[-1])+"\n"
         elif(rule=="$OP$/$OP$"):
             code=codelist[1]
             code+="MOV EBX EAX\n"
@@ -200,27 +227,51 @@ def Complie(name,rule,oplist,codelist,area_tree):
             code+="DIV EAX EBX\n"
         else:
             assert(1==0)
-    elif(name=="AND" or name=="XOR" or name=="OR" or name=="MOD"):
+    elif(name=="AND" or name=="XOR" or name=="OR"):
         if(bool(re.match("\\$OPN\\$.+\\$OPN\\$", rule))):
-            code="MOV EAX "+str(oplist[0])+"\n"
-            code+=name+" EAX "+str(oplist[1])+"\n"
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+=name+" EAX "+_addr(area_tree,oplist[1])+"\n"
         elif(bool(re.match("\\$OPN\\$.+\\$OP\\$", rule))):
             code=codelist[0]
-            code+=name+" EAX "+str(oplist[0])+"\n"
+            code+=name+" EAX "+_addr(area_tree,oplist[0])+"\n"
         elif(bool(re.match("\\$OP\\$.+\\$OPN\\$", rule))):
             code=codelist[0]
-            code+=name+" EAX "+str(oplist[-1])+"\n"
+            code+=name+" EAX "+_addr(area_tree,oplist[-1])+"\n"
         elif(bool(re.match("\\$OP\\$.+\\$OP\\$", rule))):
+            # AND/OR/XOR 交换律可保留旧写法
             code=codelist[0]
             code+="MOV EBX EAX\n"
             code+=codelist[1]
             code+=name+" EAX EBX\n"
         else:
             assert(1==0)
+    elif(name=="MOD"):
+        # MOD 非交换：必须保证 EAX = 左, EBX = 右, 然后 MOD EAX EBX (= EAX %= EBX)
+        if(bool(re.match("\\$OPN\\$.+\\$OPN\\$", rule))):
+            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
+            code+="MOD EAX "+_addr(area_tree,oplist[1])+"\n"
+        elif(bool(re.match("\\$OPN\\$.+\\$OP\\$", rule))):
+            # 左是 OPN，右是 OP（codelist[0] 为右子树代码，结果在 EAX）
+            code=codelist[0]
+            code+="MOV EBX EAX\n"           # EBX = 右
+            code+="MOV EAX "+_addr(area_tree,oplist[0])+"\n"  # EAX = 左
+            code+="MOD EAX EBX\n"
+        elif(bool(re.match("\\$OP\\$.+\\$OPN\\$", rule))):
+            # 左是 OP（已在 EAX），右是 OPN
+            code=codelist[0]
+            code+="MOD EAX "+_addr(area_tree,oplist[-1])+"\n"
+        elif(bool(re.match("\\$OP\\$.+\\$OP\\$", rule))):
+            # 沿用 SUB 的写法：先算右、暂存，再算左
+            code=codelist[1]                # 右 → EAX
+            code+="MOV EBX EAX\n"           # 右 → EBX
+            code+=codelist[0]               # 左 → EAX
+            code+="MOD EAX EBX\n"
+        else:
+            assert(1==0)
 
     elif(name=="NOT"): #处理单目运算符
         if(rule=="!$OPN$"):
-            code="NOT EAX "+str(oplist[0])+"\n"
+            code="NOT EAX "+_addr(area_tree,oplist[0])+"\n"
         elif(rule=="!$OP$"):
             code=codelist[0]
             code+="MOV EBX EAX\n"
@@ -247,10 +298,10 @@ def Complie(name,rule,oplist,codelist,area_tree):
     elif(name=="EQUAL"):
         #可能会有code针对左边的地方进行计算！
         if(rule=="$VAR$=$OPN$"):
-            code="MOV "+str(oplist[0]) +" "+str(oplist[1])+"\n"
+            code="MOV "+_addr(area_tree,oplist[0]) +" "+_addr(area_tree,oplist[1])+"\n"
         elif(rule=="$VAR$=$OP$"):   
             code=codelist[0]
-            code+= "MOV "+str(oplist[0])  + " EAX\n"
+            code+= "MOV "+_addr(area_tree,oplist[0])  + " EAX\n"
         elif(rule=="$SETP$=$OPN$"):  #这里可能会有点问题 
             for i in codelist: code+=i 
             code+="POP EBX\n"
@@ -268,19 +319,20 @@ def Complie(name,rule,oplist,codelist,area_tree):
         for i in codelist: code+=i 
         pass
     elif(name=="JUDGE"):
+        # 顺序很重要：先匹配 <=/>=/==/!= 这些两字符运算符，再匹配 < / >
         if(rule.find("<=")!=-1):
-            pass
+            code="LE "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
         elif(rule.find(">=")!=-1):
-            pass
-        if(rule.find("<")!=-1):
-            code="LESS "+oplist[0]+" "+oplist[1]+"\n"
-        elif(rule.find(">")!=-1):
-            code="GREATER "+oplist[0]+" "+oplist[1]+"\n"
+            code="GE "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
         elif(rule.find("==")!=-1):
-            code="EQUAL "+oplist[0]+" "+oplist[1]+"\n"
+            code="EQUAL "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
         elif(rule.find("!=")!=-1):
-            code="EQUAL "+oplist[0]+" "+oplist[1]+"\n"
+            code="EQUAL "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
             code+="RF\n"
+        elif(rule.find("<")!=-1):
+            code="LESS "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
+        elif(rule.find(">")!=-1):
+            code="GREATER "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
         elif(rule.find("&&")!=-1):
             code=codelist[0]
             code+="JPIF "+str((codelist[1]).count("\n")+1)+"\n"
@@ -318,7 +370,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
         
         pass
     elif(name=="PRINT"):
-        code="OUT "+str(oplist[0])+"\n"
+        code="OUT "+_addr(area_tree,oplist[0])+"\n"
         pass
     elif(name=="IN"):
         code="IN EAX\n"
@@ -428,8 +480,8 @@ def Complie(name,rule,oplist,codelist,area_tree):
         vars=[]
         struture=[]
         for i in area_tree.vars:
-            if(i.type==token_type.function): func.append(i)
-            elif(i.type==token_type.structure): struture.append(i)
+            if(i.kind==token_type.function): func.append(i)
+            elif(i.kind==token_type.structure): struture.append(i)
             else: vars.append(i)
         t.set_as_structure(oplist[0],area_tree.clac_current_pos(),func,vars)
         area_tree=area_tree.father
