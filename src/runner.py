@@ -205,9 +205,9 @@ class Runner:
             elif(keywords[0]=="DIV"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):
-                    self.memory[op1]/=self.memory[op2]
+                    self.memory[op1]=int(self.memory[op1])//int(self.memory[op2])
                 else:
-                    self.memory[op1]/=op2
+                    self.memory[op1]=int(self.memory[op1])//int(op2)
             elif(keywords[0]=="AND"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):

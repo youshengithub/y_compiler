@@ -149,6 +149,21 @@ TEST_CASES = [
     ("t118_arr_param_pass.y",   "A",    False),  # 数组参数再传递
     ("t119_arr_param_sort.y",   "1",    False),  # 数组参数排序
     ("t120_global_arr_param.y", "C",    False),  # 全局数组参数
+
+    # ---- 预处理器增强: 宏/条件编译/标准库 ----
+    ("t121_func_macro.y",       "A",    False),  # 函数式宏
+    ("t122_ifdef.y",            "AB",   False),  # #ifdef / #ifndef
+    ("t123_undef.y",            "AB",   False),  # #undef
+    ("t124_include_stdio.y",    "65",   False),  # stdio.y print_int
+    ("t125_include_math.y",     "A",    False),  # math.y abs
+    ("t126_max_min.y",          "AB",   False),  # math.y max/min
+    ("t127_gcd_lib.y",          "4",    False),  # math.y gcd
+    ("t128_include_stdlib.y",   "F",    False),  # stdlib.y 全包含
+    ("t129_multiline_macro.y",  "Hi",   False),  # 多行宏
+    ("t130_ifdef_else.y",       "A",    False),  # #ifdef #else
+    ("t131_include_guard.y",    "A",    False),  # include 防重复
+    ("t132_pow.y",              "@",    False),  # pow_int
+    ("t133_isqrt.y",            "7",    False),  # isqrt
 ]
 
 _devnull = open(os.devnull, 'w')
@@ -179,6 +194,7 @@ def compile_and_run(compiler, filepath):
         source = f.read()
 
     preprocesser = Preprocesser()
+    preprocesser.set_lib_dirs([os.path.join(ROOT, "lib")])
     preprocessed = preprocesser.process(source)
 
     _silence()

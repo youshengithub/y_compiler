@@ -50,7 +50,7 @@ tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
 PAR:$tPAR$:
 FUNCNAME:$TOKEN$:NO_START# 
 FUNC:$TYPE$$EMPTY$$FUNCNAME$(<$PAR$|>)$AREA$:
-RETURN:return$EMPTY$<$OP$|$OPN$|>:NO_START#
+RETURN:return$EMPTY$<$OP$|$OPN$> # return:NO_START#
 OPS:@^+@ # @^-@ # @^*@ # @^/@ # @^&@ # @^|@ # @^!@ # @^^@ # @^%@ :NO_START# 
 OPERATOR:$TYPE$--$OPS$--$FUNCNAME$(<$PAR$|>)$AREA$:
 ASM:asm($STRING$): NO_START

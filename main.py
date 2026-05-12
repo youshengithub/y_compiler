@@ -29,6 +29,7 @@ def main():
     runner = Runner()
     postprocesser = Postprocesser()
     preprocesser = Preprocesser()
+    preprocesser.set_lib_dirs([os.path.join(ROOT, "lib")])
 
     # 加载语法配置
     compiler.construct_componets(config_file)
