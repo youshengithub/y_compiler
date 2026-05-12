@@ -1,5 +1,5 @@
 import re
-from token_ana import *
+from src.token_ana import *
 def call_function():
     pass
 def process_var(code,op):

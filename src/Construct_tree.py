@@ -1,9 +1,9 @@
 import re,itertools
-from runner import Runner
-from token_ana import *
-from postprocesser import Postprocesser
-from preprocesser import Preprocesser
-import Compile_tree
+from src.runner import Runner
+from src.token_ana import *
+from src.postprocesser import Postprocesser
+from src.preprocesser import Preprocesser
+import src.Compile_tree as Compile_tree
 class Compoment:
     Cs={}   #语句类型
     unmatch={}
