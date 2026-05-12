@@ -47,22 +47,54 @@ def _addr(area_tree, op):
         idx_str = s[bracket_pos+1:-1]  # 去掉 [ 和 ]
         tk = area_tree.find_token(var_name)
         if tk is not None and hasattr(tk, "start_pos"):
+            # 检测是否是全局变量
+            prefix = "$"
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top:
+                    break
+                search = search.father
+            if var_top is not None and var_top is not current_top:
+                prefix = "%"
             if idx_str.isdigit():
                 # 常量下标：直接计算偏移
-                return "$" + str(tk.start_pos) + ":" + idx_str
+                return prefix + str(tk.start_pos) + ":" + idx_str
             elif idx_str[0] == '-' and idx_str[1:].isdigit():
-                return "$" + str(tk.start_pos) + ":" + idx_str
+                return prefix + str(tk.start_pos) + ":" + idx_str
             else:
                 # 变量下标：需要间接寻址 $base:$idx_var_pos
                 idx_tk = area_tree.find_token(idx_str)
                 if idx_tk is not None and hasattr(idx_tk, "start_pos"):
-                    return "$" + str(tk.start_pos) + ":$" + str(idx_tk.start_pos)
+                    return prefix + str(tk.start_pos) + ":$" + str(idx_tk.start_pos)
         return s
     # 处理结构体成员访问 a.b.c
     if '.' in s:
         parts = s.split('.')
         tk = area_tree.find_token(parts[0])
         if tk is not None and hasattr(tk, "start_pos"):
+            # 检测是否是全局变量
+            prefix = "$"
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top:
+                    break
+                search = search.father
+            if var_top is not None and var_top is not current_top:
+                prefix = "%"
             offset = 0
             current_type = tk.type
             for member_name in parts[1:]:
@@ -78,7 +110,7 @@ def _addr(area_tree, op):
                         break
                 if not member_found:
                     return s
-            return "$" + str(tk.start_pos) + ":" + str(offset)
+            return prefix + str(tk.start_pos) + ":" + str(offset)
     # 试图在符号表里找
     try:
         tk = area_tree.find_token(s)
@@ -448,12 +480,14 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "EQUAL":
-        real_codes = [c for c in codelist if c.strip() not in ("", "NOP")]
+        # 获取右值代码（codelist的最后一个元素对应右侧表达式）
+        rhs_code = codelist[-1] if codelist else ""
+        rhs_has_code = rhs_code.strip() not in ("", "NOP")
 
         # 复合赋值运算符
         if "+=" in rule:
-            if len(real_codes) > 0:
-                code = real_codes[-1]
+            if rhs_has_code:
+                code = rhs_code
                 code += "ADD EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
             else:
@@ -461,8 +495,8 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += "ADD EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
         elif "-=" in rule:
-            if len(real_codes) > 0:
-                code = real_codes[-1]
+            if rhs_has_code:
+                code = rhs_code
                 code += "MOV EBX EAX\n"
                 code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "SUB EAX EBX\n"
@@ -472,8 +506,8 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += "SUB EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
         elif "*=" in rule:
-            if len(real_codes) > 0:
-                code = real_codes[-1]
+            if rhs_has_code:
+                code = rhs_code
                 code += "MUL EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
             else:
@@ -481,8 +515,8 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += "MUL EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
         elif "/=" in rule:
-            if len(real_codes) > 0:
-                code = real_codes[-1]
+            if rhs_has_code:
+                code = rhs_code
                 code += "MOV EBX EAX\n"
                 code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "DIV EAX EBX\n"
@@ -492,8 +526,8 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += "DIV EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
         elif "%=" in rule:
-            if len(real_codes) > 0:
-                code = real_codes[-1]
+            if rhs_has_code:
+                code = rhs_code
                 code += "MOV EBX EAX\n"
                 code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOD EAX EBX\n"
@@ -502,7 +536,7 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOD EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
-        elif "=$OPN$" in rule or (len(real_codes) == 0 and "$SETP$" not in rule):
+        elif "=$OPN$" in rule or (not rhs_has_code and "$SETP$" not in rule):
             code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
         elif "$VAR$" in rule.split('=')[0]:
             # 右侧 OP 代码是 codelist 的最后一个元素
@@ -515,7 +549,7 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 # 右侧是简单常量/变量，直接 MOV
                 code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
         elif "$SETP$" in rule.split('=')[0]:
-            if len(real_codes) <= 1:
+            if not rhs_has_code:
                 for i in codelist:
                     code += i
                 code += "POP EBX\n"

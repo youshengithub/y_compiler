@@ -89,6 +89,11 @@ TEST_CASES = [
     ("t63_expr_arg.y",          "A",    False),
     ("t64_multi_return.y",      "B",    False),
     ("t65_struct_calc.y",       "A",    False),
+    ("t66_method_call.y",       "B",    False),
+    ("t67_array_func.y",        "B",    False),
+    ("t68_nested_struct.y",     "A",    False),
+    ("t69_func_call_in_expr.y", "A",    False),
+    ("t70_mutual_recursion.y",  "C",    False),
 ]
 
 _devnull = open(os.devnull, 'w')

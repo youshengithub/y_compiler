@@ -69,8 +69,20 @@ class Runner:
                  return "pos",ans+self.memory[REGS["EBP"]]
         elif text.startswith("%"):
             # 绝对地址：%n → memory[n]（不加EBP）
-            ans = int(text[1:])
-            return "pos", ans
+            # 支持 %base:idx 格式
+            inner = text[1:]
+            if ":" in inner:
+                parts = inner.split(":")
+                ans = int(parts[0])
+                if parts[1].startswith("$"):
+                    # %base:$var_pos → memory[base + memory[EBP + var_pos]]
+                    ans += int(self.memory[int(self.memory[REGS["EBP"]]) + int(parts[1][1:])])
+                else:
+                    ans += int(parts[1])
+                return "pos", ans
+            else:
+                ans = int(inner)
+                return "pos", ans
         else:
             return "real",int(text)
             
