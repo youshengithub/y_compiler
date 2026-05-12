@@ -131,6 +131,17 @@ TEST_CASES = [
     ("t103_queue.y",            "AB",   False),
     ("t104_switch_func.y",      "C",    False),
     ("t105_state_machine.y",    "A",    False),
+    # — 新增功能：else if / JUDGE表达式 / 逻辑运算 / 嵌套函数 / 数组表达式下标 / 表达式初始化 —
+    ("t106_else_if.y",          "B",    False),
+    ("t107_judge_expr.y",       "5",    False),
+    ("t108_logic_and.y",        "A",    False),
+    ("t109_logic_or.y",         "A",    False),
+    ("t110_logic_not.y",        "A",    False),
+    ("t111_nested_call.y",      "A",    False),
+    ("t112_arr_expr_idx.y",     "CE",   False),
+    ("t113_dim_expr_init.y",    "A",    False),
+    ("t114_complex_judge.y",    "2",    False),
+    ("t115_fib_nested_call.y",  "3",    False),
 ]
 
 _devnull = open(os.devnull, 'w')

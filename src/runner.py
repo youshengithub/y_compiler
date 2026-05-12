@@ -156,6 +156,9 @@ class Runner:
                     self.memory[op1]=self.memory[op2]
                 else:
                     self.memory[op1]=op2
+                # 如果目标是 EIP，跳过自动 +1（等价于绝对跳转）
+                if op1 == REGS["EIP"]:
+                    continue
             elif(keywords[0]=="TO"):
                 assert(1==0)
                 self.memory[REGS[keywords[1]]]=self.memory[REGS[keywords[2]]]
@@ -216,8 +219,16 @@ class Runner:
                     self.memory[op1]= ~ int(op2)
             elif(keywords[0]=="LEA"):
                 assert(flag1=="pos")
-                assert(flag2=="pos")
-                self.memory[op1]=op2
+                if(flag2=="pos"):
+                    # LEA dst src: 如果 dst 和 src 相同，解引用: dst = memory[memory[src]]
+                    # 否则: dst = memory[src] 的位置值（即 src 作为位置赋给 dst）
+                    if op1 == op2:
+                        self.memory[op1] = self.memory[int(self.memory[op2])]
+                    else:
+                        self.memory[op1] = self.memory[int(self.memory[op2])]
+                else:
+                    # flag2 == "real": 直接将数值存入（取地址）
+                    self.memory[op1] = op2
                 
             elif(keywords[0]=="SEA"):#把M[M[op1]]放入op2
                 assert(flag1=="pos")

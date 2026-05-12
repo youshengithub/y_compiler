@@ -97,6 +97,11 @@ class Preprocesser:
         pre=self.remove_spaces_outside_quotes(text.replace('\n', '').replace('\t', ''))
         next=self.remove_spaces_around_symbols(pre)
         ans=next.replace('\x00', ' ')
+        # 合并 else if → elif（方便语法解析）
+        ans=ans.replace('else if', 'elif')
+        # 将 && || 替换为特殊 token，避免与位运算 & | 冲突
+        ans=ans.replace('&&', '~and~')
+        ans=ans.replace('||', '~or~')
         return ans
     def process(self,text):#处理预处理器命令#
         text=self.process_include(text)

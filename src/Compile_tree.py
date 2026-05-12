@@ -287,6 +287,9 @@ def Complie(name, rule, oplist, codelist, area_tree):
             pass
         elif rule == "$VAR$":
             pass
+        elif rule == "$ARRIDX$":
+            for i in codelist:
+                code += i
         elif rule == "($OP$)":
             for i in codelist:
                 code += i
@@ -593,8 +596,58 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOD EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
-        elif "=$OPN$" in rule or (not rhs_has_code and "$SETP$" not in rule):
+        elif "=$OPN$" in rule or (not rhs_has_code and "$SETP$" not in rule and "$ARRIDX$" not in rule):
             code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
+        elif "$ARRIDX$" in rule.split('=')[0]:
+            # 数组表达式下标赋值: a[expr] = rhs
+            arr_name = oplist[0]
+            tk = area_tree.find_token(arr_name)
+            base_pos = tk.start_pos if tk and hasattr(tk, "start_pos") else 0
+            # 检查全局
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top: break
+                search = search.father
+            is_global = (var_top is not None and var_top is not current_top)
+            
+            # ARRIDX 的索引表达式代码在 codelist[0] 中（ARRIDX 编译结果）
+            # 但 ARRIDX 编译结果包含 LEA（读取值），我们需要的是地址
+            # 直接从 codelist 获取索引代码
+            idx_code = codelist[0] if len(codelist) > 0 else ""
+            rhs_code_part = codelist[-1] if len(codelist) > 1 else ""
+            rhs_has = rhs_code_part.strip() not in ("", "NOP")
+            idx_has = idx_code.strip() not in ("", "NOP")
+            
+            if idx_has:
+                # 去掉 ARRIDX 生成的 LEA（获取地址而非值）
+                addr_code = idx_code.replace("LEA EAX EAX\n", "")
+                if rhs_has:
+                    # 先算右值
+                    code = rhs_code_part
+                    code += "PUSH EAX\n"
+                    # 再算地址
+                    code += addr_code  # EAX = 地址
+                    code += "POP EBX\n"
+                    code += "SEA EAX EBX\n"
+                else:
+                    code = addr_code  # EAX = 地址
+                    code += "SEA EAX " + _addr(area_tree, oplist[-1]) + "\n"
+            else:
+                # 简单索引：走原始 _addr 路径
+                idx_val = oplist[1] if len(oplist) > 1 else "0"
+                full_ref = _addr(area_tree, arr_name + "[" + idx_val + "]")
+                if rhs_has:
+                    code = rhs_code_part
+                    code += "MOV " + full_ref + " EAX\n"
+                else:
+                    code = "MOV " + full_ref + " " + _addr(area_tree, oplist[-1]) + "\n"
         elif "$VAR$" in rule.split('=')[0]:
             # 右侧 OP 代码是 codelist 的最后一个元素
             op_code = codelist[-1] if codelist else ""
@@ -641,43 +694,149 @@ def Complie(name, rule, oplist, codelist, area_tree):
     elif name == "SENTENCE":
         for i in codelist:
             code += i
-        pass
-
+    elif name == "ARRIDX":
+        # $VAR$[$OP$] — oplist[0] = 数组名, codelist[1] = 索引表达式代码
+        arr_name = oplist[0]
+        idx_code = codelist[1] if len(codelist) > 1 else ""
+        idx_has = idx_code.strip() not in ("", "NOP")
+        
+        # 获取数组基地址信息
+        tk = area_tree.find_token(arr_name)
+        if tk is not None and hasattr(tk, "start_pos"):
+            base_pos = tk.start_pos
+            # 检查是否全局变量
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top: break
+                search = search.father
+            is_global = (var_top is not None and var_top is not current_top)
+        else:
+            base_pos = 0
+            is_global = False
+        
+        if idx_has:
+            # 索引是表达式：先计算索引到 EAX
+            code = idx_code  # EAX = 索引表达式的值
+            if is_global:
+                code += "ADD EAX " + str(base_pos) + "\n"
+            else:
+                code += "ADD EAX EBP\n"
+                if base_pos != 0:
+                    code += "ADD EAX " + str(base_pos) + "\n"
+            code += "LEA EAX EAX\n"
+        else:
+            # 索引是简单变量/常量：直接用 _addr 格式
+            idx_val = oplist[1] if len(oplist) > 1 else "0"
+            arr_ref = _addr(area_tree, arr_name + "[" + idx_val + "]")
+            code = "MOV EAX " + arr_ref + "\n"
     elif name == "JUDGE":
-        # 顺序：先匹配 <=/>=/==/!= 再匹配 < / >
-        if rule.find("<=") != -1:
-            code = "LE " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-        elif rule.find(">=") != -1:
-            code = "GE " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-        elif rule.find("==") != -1:
-            code = "EQUAL " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-        elif rule.find("!=") != -1:
-            code = "EQUAL " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-            code += "RF\n"
-        elif rule.find("<") != -1:
-            code = "LESS " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-        elif rule.find(">") != -1:
-            code = "GREATER " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
-        elif rule.find("&&") != -1:
+        # JUDGE 的子规则: $OP$==$OP$ / $OP$>=$OP$ / ($COND$) 等
+        if rule.find("<=") != -1 or rule.find(">=") != -1 or rule.find("==") != -1 or rule.find("!=") != -1 or rule.find("<") != -1 or rule.find(">") != -1:
+            # 比较运算：左OP codelist[0], 右OP codelist[1]
+            left_code = codelist[0] if len(codelist) > 0 else ""
+            right_code = codelist[1] if len(codelist) > 1 else ""
+            left_has = left_code.strip() not in ("", "NOP")
+            right_has = right_code.strip() not in ("", "NOP")
+
+            if not left_has and not right_has:
+                left_addr = _addr(area_tree, oplist[0])
+                right_addr = _addr(area_tree, oplist[1]) if len(oplist) > 1 else _addr(area_tree, oplist[0])
+            elif left_has and not right_has:
+                code = left_code
+                left_addr = "EAX"
+                right_addr = _addr(area_tree, oplist[-1])
+            elif not left_has and right_has:
+                code = right_code
+                left_addr = _addr(area_tree, oplist[0])
+                right_addr = "EAX"
+            else:
+                code = right_code
+                code += "MOV EBX EAX\n"
+                code += left_code
+                left_addr = "EAX"
+                right_addr = "EBX"
+
+            if rule.find("<=") != -1:
+                cmp_code = "LE " + left_addr + " " + right_addr + "\n"
+            elif rule.find(">=") != -1:
+                cmp_code = "GE " + left_addr + " " + right_addr + "\n"
+            elif rule.find("==") != -1:
+                cmp_code = "EQUAL " + left_addr + " " + right_addr + "\n"
+            elif rule.find("!=") != -1:
+                cmp_code = "EQUAL " + left_addr + " " + right_addr + "\n"
+                cmp_code += "RF\n"
+            elif rule.find("<") != -1:
+                cmp_code = "LESS " + left_addr + " " + right_addr + "\n"
+            elif rule.find(">") != -1:
+                cmp_code = "GREATER " + left_addr + " " + right_addr + "\n"
+            else:
+                cmp_code = ""
+            code += cmp_code
+        else:
+            # 检查是否是逻辑非 !$<OP|OPN>$
+            if "!" in rule and "$COND$" not in rule:
+                # !expr → EQUAL expr 0 (expr == 0 时 EFG=False, JPIF 不跳 = 条件真)
+                # 但 JPIF 在 EFG==True 时跳转... 
+                # 实际上：EQUAL $x 0 → EFG = not (x == 0) → 如果 x==0 则 EFG=False（不跳转）
+                # 我们需要：!x 为真（x==0）时 EFG=False（不跳转）→ EQUAL x 0 正好
+                expr_code = codelist[0] if len(codelist) > 0 else ""
+                expr_has = expr_code.strip() not in ("", "NOP")
+                if expr_has:
+                    code = expr_code
+                    code += "EQUAL EAX 0\n"
+                else:
+                    code = "EQUAL " + _addr(area_tree, oplist[0]) + " 0\n"
+            else:
+                # ($COND$) — 括号条件，透传
+                for i in codelist:
+                    code += i
+
+    elif name == "COND":
+        # COND: $JUDGE$~and~$COND$ / $JUDGE$~or~$COND$ / $JUDGE$
+        if rule.find("~and~") != -1:
             code = codelist[0]
             code += "JPIF " + str((codelist[1]).count("\n") + 1) + "\n"
             code += codelist[1]
-        elif rule.find("||") != -1:
+        elif rule.find("~or~") != -1:
             code = codelist[0]
             code += "JPNIF " + str((codelist[1]).count("\n") + 1) + "\n"
             code += codelist[1]
         else:
+            # 单纯的 $JUDGE$ 透传
             for i in codelist:
                 code += i
 
     elif name == "IF":
         code = codelist[0]
         if len(codelist) >= 3:
+            # if-else 或 if-elif
             code += "JPIF " + str((codelist[1]).count("\n") + 2) + "\n"
             code += codelist[1]
             code += "JMP " + str((codelist[2]).count("\n") + 1) + "\n"
             code += codelist[2]
-        else:
+        elif len(codelist) >= 2:
+            code += "JPIF " + str((codelist[1]).count("\n") + 1) + "\n"
+            code += codelist[1]
+        pass
+
+    elif name == "ELIF":
+        # ELIF 结构类似 IF：JUDGE + AREA + 可选(递归ELIF 或 else AREA)
+        code = codelist[0]  # JUDGE 条件代码
+        if len(codelist) >= 3:
+            # elif(cond){body} + 递归ELIF/else
+            code += "JPIF " + str((codelist[1]).count("\n") + 2) + "\n"
+            code += codelist[1]
+            code += "JMP " + str((codelist[2]).count("\n") + 1) + "\n"
+            code += codelist[2]
+        elif len(codelist) >= 2:
+            # elif(cond){body} 无else
             code += "JPIF " + str((codelist[1]).count("\n") + 1) + "\n"
             code += codelist[1]
         pass
@@ -788,13 +947,14 @@ def Complie(name, rule, oplist, codelist, area_tree):
             toend = len(revise_code) - i
             revise_code[i] = revise_code[i].replace("END", str(toend))
             code = code + revise_code[i] + "\n"
-        # 函数尾声：恢复寄存器（注意：不恢复 EAX，EAX 作为返回值通道）
-        code += "MOV ESP $0:-6\n"
-        code += "MOV EBX $0:-3\n"
-        code += "MOV EFG $0:-2\n"
-        code += "MOV ETP $0:-1\n"
-        code += "MOV EBP $0:-5\n"
-        code += "MOV EIP ETP\n"
+        # 函数尾声：恢复寄存器
+        # 保存区布局 [-7]:ESP [-6]:EBP [-5]:EAX [-4]:EBX [-3]:EFG [-2]:ETP [-1]:返回地址
+        code += "MOV ESP $0:-7\n"   # 恢复 ESP
+        code += "MOV EBX $0:-4\n"   # 恢复 EBX
+        code += "MOV EFG $0:-1\n"   # 暂存返回地址到 EFG（EFG旧值不重要）
+        code += "MOV ETP $0:-2\n"   # 恢复 ETP
+        code += "MOV EBP $0:-6\n"   # 恢复 EBP
+        code += "MOV EIP EFG\n"     # 绝对跳转到返回地址
         code = "JMP " + str(code.count("\n") + 1) + "\n" + code
         code = "ALLOC @" + oplist[1] + "\n" + code
         area_tree = area_tree.father
@@ -847,25 +1007,27 @@ def Complie(name, rule, oplist, codelist, area_tree):
                     code += i
         else:
             # 普通函数调用
-            # 使用 PUSH 将保存区压入栈（避免 $0:EAX 格式被 runner 错误解析）
-            code = "PUSH ESP\n"       # [0] 保存 ESP
-            code += "PUSH EBP\n"      # [1] 保存 EBP
-            code += "PUSH EAX\n"      # [2] 保存 EAX（被覆盖无大碍）
-            code += "PUSH EBX\n"      # [3] 保存 EBX
-            code += "PUSH EFG\n"      # [4] 保存 EFG
-            code += "ADD ESP 1\n"     # [5] 为返回地址留位置
+            # 保存区布局（相对 EBP 的负偏移）：
+            # [-7]: ESP, [-6]: EBP, [-5]: EAX, [-4]: EBX, [-3]: EFG, [-2]: ETP, [-1]: 返回地址
+            code = "PUSH ESP\n"       # [-7]
+            code += "PUSH EBP\n"      # [-6]
+            code += "PUSH EAX\n"      # [-5]
+            code += "PUSH EBX\n"      # [-4]
+            code += "PUSH EFG\n"      # [-3]
+            code += "PUSH ETP\n"      # [-2]
+            code += "ADD ESP 1\n"     # [-1] 为返回地址预留
             code += "MOV ETP ESP\n"   # ETP = 新栈帧基址
             # 压入参数（codelist中可能有TOKEN的空代码和ARG的参数代码）
             for c_item in codelist:
                 if c_item.strip() and c_item.strip() != "NOP":
                     code += c_item
 
-            # 保存返回地址到保存区 [5]（ETP-1 的位置）
+            # 保存返回地址到 [-1] 位置（ETP-1）
             code += "MOV EAX EIP\n"
-            code += "ADD EAX 6\n"
+            code += "ADD EAX 7\n"       # 返回到JMP之后（MOV EIP绝对跳转）
             code += "MOV EBX ETP\n"
             code += "SUB EBX 1\n"
-            code += "SEA EBX EAX\n"   # memory[memory[EBX]] = EAX → memory[ETP-1] = 返回地址
+            code += "SEA EBX EAX\n"   # memory[ETP-1] = 返回地址
 
             code += "MOV EBP ETP\n"
             code += "JMP @" + oplist[0] + "\n"
