@@ -43,19 +43,19 @@ TEST_CASES = [
     ("t18_compound.y",      "Z",    False),
     ("t19_string.y",        "A",    False),
     ("t20_asm.y",           "A",    False),
-    ("t21_func.y",          "A",    True),   # 已知限制: 函数参数传递未完成
+    ("t21_func.y",          "A",    False),
     ("t22_define.y",        "A",    False),
     ("t23_nested_loop.y",   "9",    False),
     ("t24_multi_out.y",     "OK",   False),
     ("t25_sum.y",           "6",    False),
     ("t26_precedence_mul_add.y", "7", False),
-    ("t27_precedence_mul_sub.y", "4", False),  # 优先级已修复
-    ("t28_precedence_paren.y",   "9", False),  # 优先级已修复
+    ("t27_precedence_mul_sub.y", "4", False),
+    ("t28_precedence_paren.y",   "9", False),
     ("t29_precedence_div_add.y", "4", False),
     ("t30_precedence_mixed.y",   "8", False),
-    ("t31_func_return.y",       "A",    True),   # 已知限制: 函数返回值未完成
+    ("t31_func_return.y",       "A",    False),
     ("t32_dim_init.y",          "A",    False),
-    ("t33_dim_expr_init.y",     "A",    True),   # 已知限制: DIM不支持表达式初始化
+    ("t33_dim_expr_init.y",     "A",    False),
     ("t34_compound_add.y",      "A",    False),
     ("t35_compound_sub.y",      "A",    False),
     ("t36_compound_mul.y",      "A",    False),
@@ -65,9 +65,9 @@ TEST_CASES = [
     ("t40_continue.y",          "2",    False),
     ("t41_outnum.y",            "65",   False),
     ("t42_multiline_comment.y", "A",    False),
-    ("t43_struct.y",            "AB",   True),   # 已知限制: 结构体字段地址未实现
+    ("t43_struct.y",            "AB",   False),
     ("t44_while_break.y",       "1",    False),
-    ("t45_func_multi_args.y",   "A",    True),   # 已知限制: 多参数函数调用未完成
+    ("t45_func_multi_args.y",   "A",    False),
     ("t46_out_expr.y",          "A",    False),
     ("t47_for_incr.y",          ":",    False),
     ("t48_outnum_expr.y",       "100",  False),

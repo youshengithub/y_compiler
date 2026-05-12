@@ -39,6 +39,27 @@ def _addr(area_tree, op):
         return s
     if s[0] in ("$", "%", "@"):
         return s
+    # 处理结构体成员访问 a.b.c
+    if '.' in s:
+        parts = s.split('.')
+        tk = area_tree.find_token(parts[0])
+        if tk is not None and hasattr(tk, "start_pos"):
+            offset = 0
+            current_type = tk.type
+            for member_name in parts[1:]:
+                struct_def = area_tree.find_token(current_type)
+                if struct_def is None:
+                    return s  # 找不到结构体定义，返回原始
+                member_found = False
+                for var in struct_def.vars:
+                    if var.name == member_name:
+                        offset += var.start_pos
+                        current_type = var.type
+                        member_found = True
+                        break
+                if not member_found:
+                    return s
+            return "$" + str(tk.start_pos) + ":" + str(offset)
     # 试图在符号表里找
     try:
         tk = area_tree.find_token(s)
@@ -191,7 +212,8 @@ def Complie(name, rule, oplist, codelist, area_tree):
             t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
             area_tree.append_var(t, t.size)
             code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
-            real_code = codelist[0] if codelist else ""
+            # OP 代码在 codelist 最后一个元素（前面是 TYPE/EMPTY/TOKEN 的空代码）
+            real_code = codelist[-1] if codelist else ""
             if real_code.strip() not in ("", "NOP"):
                 # 有实际表达式代码，结果在 EAX
                 code += real_code
@@ -443,8 +465,15 @@ def Complie(name, rule, oplist, codelist, area_tree):
         elif "=$OPN$" in rule or (len(real_codes) == 0 and "$SETP$" not in rule):
             code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
         elif "$VAR$" in rule.split('=')[0]:
-            code = real_codes[-1] if real_codes else ""
-            code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            # 右侧 OP 代码是 codelist 的最后一个元素
+            op_code = codelist[-1] if codelist else ""
+            if op_code.strip() and op_code.strip() != "NOP":
+                # 右侧有实际表达式代码（结果在 EAX），直接 MOV 到左值
+                code = op_code
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                # 右侧是简单常量/变量，直接 MOV
+                code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
         elif "$SETP$" in rule.split('=')[0]:
             if len(real_codes) <= 1:
                 for i in codelist:
@@ -645,9 +674,10 @@ def Complie(name, rule, oplist, codelist, area_tree):
 
             code += "ADD ESP 6\n"
             code += "MOV ETP ESP\n"
-            # 压入参数
-            if len(codelist) > 0:
-                code += codelist[0]
+            # 压入参数（codelist中可能有TOKEN的空代码和ARG的参数代码）
+            for c_item in codelist:
+                if c_item.strip() and c_item.strip() != "NOP":
+                    code += c_item
 
             code += "MOV EAX EIP\n"
             code += "ADD EAX 4\n"
@@ -663,8 +693,14 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "PAR":
+        # 形参声明：只保留符号表注册，过滤掉ALLOC（空间由CALL端分配）
         for i in codelist:
-            code += i
+            filtered = "\n".join(
+                line for line in i.split("\n")
+                if not line.startswith("ALLOC")
+            )
+            if filtered.strip():
+                code += filtered + "\n"
         code += "NOP\n"
         pass
 
@@ -683,12 +719,20 @@ def Complie(name, rule, oplist, codelist, area_tree):
             code += "ADD ESP 1\n"
         elif rule == "$OP$":
             # 表达式参数：先计算（结果在EAX），然后存入参数位置
-            code = codelist[0] if codelist else ""
-            code += "MOV EBX EAX\n"  # 暂存表达式结果
-            code += "MOV EAX ESP\n"
-            code += "SUB EAX EBP\n"
-            code += "MOV $0:EAX EBX\n"
-            code += "ADD ESP 1\n"
+            real_code = codelist[0] if codelist else ""
+            if real_code.strip() and real_code.strip() != "NOP":
+                code = real_code
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX ESP\n"
+                code += "SUB EAX EBP\n"
+                code += "MOV $0:EAX EBX\n"
+                code += "ADD ESP 1\n"
+            else:
+                # 简单常量/变量，直接MOV
+                code = "MOV EAX ESP\n"
+                code += "SUB EAX EBP\n"
+                code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "ADD ESP 1\n"
         elif "$OPN$,$tARG$" in rule:
             # 先处理当前参数（OPN），再递归处理剩余参数
             code = "MOV EAX ESP\n"
@@ -700,12 +744,20 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += codelist[0]
         elif "$OP$,$tARG$" in rule:
             # 先计算表达式参数
-            code = codelist[0] if codelist else ""
-            code += "MOV EBX EAX\n"
-            code += "MOV EAX ESP\n"
-            code += "SUB EAX EBP\n"
-            code += "MOV $0:EAX EBX\n"
-            code += "ADD ESP 1\n"
+            real_code = codelist[0] if codelist else ""
+            if real_code.strip() and real_code.strip() != "NOP":
+                code = real_code
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX ESP\n"
+                code += "SUB EAX EBP\n"
+                code += "MOV $0:EAX EBX\n"
+                code += "ADD ESP 1\n"
+            else:
+                # 简单常量/变量
+                code = "MOV EAX ESP\n"
+                code += "SUB EAX EBP\n"
+                code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "ADD ESP 1\n"
             # 递归部分
             if len(codelist) > 1:
                 code += codelist[1]
@@ -716,8 +768,14 @@ def Complie(name, rule, oplist, codelist, area_tree):
 
     elif name == "RETURN":
         if "$OP$" in rule:
-            for i in codelist:
-                code += i
+            real_codes = [c_item for c_item in codelist if c_item.strip() and c_item.strip() != "NOP"]
+            if real_codes:
+                for c_item in real_codes:
+                    code += c_item
+                # 表达式结果已在 EAX 中
+            else:
+                # OP 是简单常量/变量，需要显式 MOV EAX
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
         elif "$OPN$" in rule:
             code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
         else:
