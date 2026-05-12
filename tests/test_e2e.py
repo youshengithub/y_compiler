@@ -72,6 +72,23 @@ TEST_CASES = [
     ("t47_for_incr.y",          ":",    False),
     ("t48_outnum_expr.y",       "100",  False),
     ("t49_compound_div_mod.y",  "6",    False),
+    # — 新增功能测试 —
+    ("t50_array_index.y",       "ABC",  False),
+    ("t51_negative.y",          "A",    False),
+    ("t52_void_call.y",         "A",    False),
+    ("t53_global_var.y",        "A",    False),
+    ("t54_recursive.y",         "0",    False),
+    ("t55_switch.y",            "B",    False),
+    ("t56_method.y",            "A",    False),
+    ("t57_array_param.y",       "B",    False),
+    ("t58_switch_case.y",       "C",    False),
+    ("t59_fib.y",               "3",    False),
+    ("t60_global_counter.y",    "3",    False),
+    ("t61_array_sum.y",         "6",    False),
+    ("t62_nested_func.y",       "A",    False),
+    ("t63_expr_arg.y",          "A",    False),
+    ("t64_multi_return.y",      "B",    False),
+    ("t65_struct_calc.y",       "A",    False),
 ]
 
 _devnull = open(os.devnull, 'w')

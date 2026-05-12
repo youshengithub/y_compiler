@@ -6,8 +6,8 @@ REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# IS_KEYWO
 VAR: $REGS$  # @((^(?!struct$)(?!class)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!outnum$)(?!else$)(?!func)(?!return)(?!struct$)(?!int$)(?!asm$)(?!double$)(?!break$)(?!continue$)(?!switch$)(?!case$)(?!default$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!asm$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ :NO_START# 
 CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
 STRING:@^"([^"]|(\\"))*"@:NO_START# 
-OPN:$VAR$ # $CONST$ # ($OP$) :NO_START# 
-OP: $CALL$ # $ADD$ # $SUB$ # $AND$ # $OR$ # $XOR$ # $FACTOR$ :NO_START# 
+OPN:$CALL$ # $VAR$ # $CONST$ # ($OP$) :NO_START# 
+OP: $ADD$ # $SUB$ # $CALL$ # $AND$ # $OR$ # $XOR$ # $FACTOR$ :NO_START# 
 FACTOR: $MUL$ # $DIV$ # $MOD$ # $UNARY$ :NO_START#
 UNARY: $NOT$ # $GETP$ # $IN$ # $OPN$ :NO_START#
 ADD:$<OP|FACTOR>$+$<OP|FACTOR>$:NO_START# 

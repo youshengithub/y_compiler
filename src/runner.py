@@ -67,6 +67,10 @@ class Runner:
                 return "pos",ans
             else:
                  return "pos",ans+self.memory[REGS["EBP"]]
+        elif text.startswith("%"):
+            # 绝对地址：%n → memory[n]（不加EBP）
+            ans = int(text[1:])
+            return "pos", ans
         else:
             return "real",int(text)
             

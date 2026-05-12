@@ -39,6 +39,25 @@ def _addr(area_tree, op):
         return s
     if s[0] in ("$", "%", "@"):
         return s
+    # 处理数组下标访问 a[0] 或 a[i]
+    if '[' in s:
+        # 解析变量名和下标
+        bracket_pos = s.index('[')
+        var_name = s[:bracket_pos]
+        idx_str = s[bracket_pos+1:-1]  # 去掉 [ 和 ]
+        tk = area_tree.find_token(var_name)
+        if tk is not None and hasattr(tk, "start_pos"):
+            if idx_str.isdigit():
+                # 常量下标：直接计算偏移
+                return "$" + str(tk.start_pos) + ":" + idx_str
+            elif idx_str[0] == '-' and idx_str[1:].isdigit():
+                return "$" + str(tk.start_pos) + ":" + idx_str
+            else:
+                # 变量下标：需要间接寻址 $base:$idx_var_pos
+                idx_tk = area_tree.find_token(idx_str)
+                if idx_tk is not None and hasattr(idx_tk, "start_pos"):
+                    return "$" + str(tk.start_pos) + ":$" + str(idx_tk.start_pos)
+        return s
     # 处理结构体成员访问 a.b.c
     if '.' in s:
         parts = s.split('.')
@@ -66,6 +85,24 @@ def _addr(area_tree, op):
     except Exception:
         tk = None
     if tk is not None and hasattr(tk, "start_pos"):
+        # 判断变量是否在当前顶级域中
+        # 当前顶级域
+        current_top = area_tree.find_top_father()
+        # 查找变量所在的顶级域（沿父链查找包含该变量的area）
+        search = area_tree
+        var_top = None
+        while search is not None:
+            if hasattr(search, "vars"):
+                for v in search.vars:
+                    if v is tk:
+                        var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                        break
+            if var_top:
+                break
+            search = search.father
+        # 如果变量在不同的顶级域中（全局变量），使用绝对地址
+        if var_top is not None and var_top is not current_top:
+            return "%" + str(tk.start_pos)
         return "$" + str(tk.start_pos)
     return s
 
@@ -162,6 +199,9 @@ def Complie(name, rule, oplist, codelist, area_tree):
         elif rule == "$VAR$":
             pass
         elif rule == "($OP$)":
+            for i in codelist:
+                code += i
+        elif rule == "$CALL$":
             for i in codelist:
                 code += i
         pass
@@ -662,26 +702,25 @@ def Complie(name, rule, oplist, codelist, area_tree):
                     code += i
         else:
             # 普通函数调用
-            # 保存寄存器
-            code = "MOV EAX ESP\n"
-            code += "SUB EAX EBP\n"
-            code += "MOV $0:EAX ESP\n"
-            code += "MOV $1:EAX EBP\n"
-            code += "MOV $2:EAX EAX\n"
-            code += "MOV $3:EAX EBX\n"
-            code += "MOV $4:EAX EFG\n"
-            code += "MOV EBX EAX\n"  # 保存偏移
-
-            code += "ADD ESP 6\n"
-            code += "MOV ETP ESP\n"
+            # 使用 PUSH 将保存区压入栈（避免 $0:EAX 格式被 runner 错误解析）
+            code = "PUSH ESP\n"       # [0] 保存 ESP
+            code += "PUSH EBP\n"      # [1] 保存 EBP
+            code += "PUSH EAX\n"      # [2] 保存 EAX（被覆盖无大碍）
+            code += "PUSH EBX\n"      # [3] 保存 EBX
+            code += "PUSH EFG\n"      # [4] 保存 EFG
+            code += "ADD ESP 1\n"     # [5] 为返回地址留位置
+            code += "MOV ETP ESP\n"   # ETP = 新栈帧基址
             # 压入参数（codelist中可能有TOKEN的空代码和ARG的参数代码）
             for c_item in codelist:
                 if c_item.strip() and c_item.strip() != "NOP":
                     code += c_item
 
+            # 保存返回地址到保存区 [5]（ETP-1 的位置）
             code += "MOV EAX EIP\n"
-            code += "ADD EAX 4\n"
-            code += "MOV $5:EBX EAX\n"
+            code += "ADD EAX 6\n"
+            code += "MOV EBX ETP\n"
+            code += "SUB EBX 1\n"
+            code += "SEA EBX EAX\n"   # memory[memory[EBX]] = EAX → memory[ETP-1] = 返回地址
 
             code += "MOV EBP ETP\n"
             code += "JMP @" + oplist[0] + "\n"
@@ -711,34 +750,24 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "tARG":
-        # tARG 递归处理参数列表
+        # tARG 递归处理参数列表 — 用 PUSH 压栈
         if rule == "$OPN$":
-            code = "MOV EAX ESP\n"
-            code += "SUB EAX EBP\n"
-            code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
-            code += "ADD ESP 1\n"
+            addr = _addr(area_tree, oplist[0])
+            code = "PUSH " + addr + "\n"
         elif rule == "$OP$":
-            # 表达式参数：先计算（结果在EAX），然后存入参数位置
+            # 表达式参数：先计算（结果在EAX），然后PUSH
             real_code = codelist[0] if codelist else ""
             if real_code.strip() and real_code.strip() != "NOP":
                 code = real_code
-                code += "MOV EBX EAX\n"
-                code += "MOV EAX ESP\n"
-                code += "SUB EAX EBP\n"
-                code += "MOV $0:EAX EBX\n"
-                code += "ADD ESP 1\n"
+                code += "PUSH EAX\n"
             else:
-                # 简单常量/变量，直接MOV
-                code = "MOV EAX ESP\n"
-                code += "SUB EAX EBP\n"
-                code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
-                code += "ADD ESP 1\n"
+                # 简单常量/变量
+                addr = _addr(area_tree, oplist[0])
+                code = "PUSH " + addr + "\n"
         elif "$OPN$,$tARG$" in rule:
             # 先处理当前参数（OPN），再递归处理剩余参数
-            code = "MOV EAX ESP\n"
-            code += "SUB EAX EBP\n"
-            code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
-            code += "ADD ESP 1\n"
+            addr = _addr(area_tree, oplist[0])
+            code = "PUSH " + addr + "\n"
             # 递归部分
             if codelist:
                 code += codelist[0]
@@ -747,17 +776,11 @@ def Complie(name, rule, oplist, codelist, area_tree):
             real_code = codelist[0] if codelist else ""
             if real_code.strip() and real_code.strip() != "NOP":
                 code = real_code
-                code += "MOV EBX EAX\n"
-                code += "MOV EAX ESP\n"
-                code += "SUB EAX EBP\n"
-                code += "MOV $0:EAX EBX\n"
-                code += "ADD ESP 1\n"
+                code += "PUSH EAX\n"
             else:
                 # 简单常量/变量
-                code = "MOV EAX ESP\n"
-                code += "SUB EAX EBP\n"
-                code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
-                code += "ADD ESP 1\n"
+                addr = _addr(area_tree, oplist[0])
+                code = "PUSH " + addr + "\n"
             # 递归部分
             if len(codelist) > 1:
                 code += codelist[1]
