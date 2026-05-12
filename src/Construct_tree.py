@@ -7,6 +7,11 @@ import src.Compile_tree as Compile_tree
 class Compoment:
     Cs={}   #语句类型
     unmatch={}
+    deepest_fail_pos = 0    # 全局最远失败位置（用于错误报告）
+    deepest_fail_rule = ""  # 最远失败时的规则
+    deepest_fail_name = ""  # 最远失败时的非终结符
+    original_text = ""      # 原始完整输入（用于计算偏移量）
+
     def __init__(self, name_,config_,repeat_,no_start,is_keywords):
         self.configs=config_
         self.name=name_
@@ -45,7 +50,12 @@ class Compoment:
                             return False,text_c,oplist,codelist
                         oplist.append(match_text) #直接把token放进去
                 else:
-                    #if(text_c!=text): print("正则表达式无法识别---",rule,"-->\n",text)
+                    # 记录最远失败位置
+                    consumed = len(Compoment.original_text) - len(text)
+                    if consumed > Compoment.deepest_fail_pos:
+                        Compoment.deepest_fail_pos = consumed
+                        Compoment.deepest_fail_rule = rule
+                        Compoment.deepest_fail_name = self.name
                     return False,text_c,oplist,codelist
             elif(rule.startswith("$")):
                 next_index = rule[1:].find('$')
@@ -60,7 +70,12 @@ class Compoment:
                         codelist+=[code]
                     continue
                 else:
-                    #if(text_c!=text):     print("$$识别错误---",rule,"-->\n",text,"\n")
+                    # 记录最远失败位置
+                    consumed = len(Compoment.original_text) - len(text)
+                    if consumed > Compoment.deepest_fail_pos:
+                        Compoment.deepest_fail_pos = consumed
+                        Compoment.deepest_fail_rule = rule
+                        Compoment.deepest_fail_name = self.name
                     return False,text_c,oplist,codelist
             else: #这里用来消除关键字
                     dollar_index = rule.find('$')
@@ -69,9 +84,13 @@ class Compoment:
                         text=text[len(keyword):]  
                         rule=rule[len(keyword):]  
                     else:
-                        #if(text_c!=text): print("有多余关键字未识别---",rule,"-->\n",text)
+                        # 记录最远失败位置
+                        consumed = len(Compoment.original_text) - len(text)
+                        if consumed > Compoment.deepest_fail_pos:
+                            Compoment.deepest_fail_pos = consumed
+                            Compoment.deepest_fail_rule = rule
+                            Compoment.deepest_fail_name = self.name
                         return False,text_c,oplist,codelist
-        #print("识别成功:",self.name,"->",text_c,"--->",c_rule)
         return True,text,oplist,codelist
     def Rrcognize(self,text):
         flag=False
@@ -82,7 +101,8 @@ class Compoment:
             repeat=False
             for rule in self.configs:#通过语句构建,这个选择一种规则！
                 textc=text
-                key=(hash(text),self.name,rule) #使用hash节约内存
+                # 使用 hash(text) 作为缓存键，节省内存（text可能很长）
+                key=(hash(text),self.name,rule)
                 if(key in Compoment.unmatch ): #使用缓存，避免重复解析
                     if(Compoment.unmatch[key]=="PROCESSING"): #陷入重入
                         succ=False
@@ -96,33 +116,70 @@ class Compoment:
                     flag=True
                     repeat=self.repeat
                     r_oplist=oplist
-                    compiled_code=[(self.name,rule,oplist,code_list,textc[0:len(textc)-len(text)] )]
-                    r_code+=compiled_code #+" Rule: "+rule
-                    break   #这里仿佛也不应该call;最好是用 
+                    # 使用 ASTNode dataclass 替代原始 tuple
+                    compiled_code=[ASTNode(
+                        name=self.name,
+                        rule=rule,
+                        oplist=oplist,
+                        children=code_list,
+                        source=textc[0:len(textc)-len(text)]
+                    )]
+                    r_code+=compiled_code
+                    break
         return flag,text,r_code,r_oplist
 class Compiler:
-    #VARPos=环境
     def __init__(self) -> None:
         pass
     def ana2(self,text,codes=[]):
-        state=[(text,codes)]
-        ans_code=[]
-        while len(state)!=0:
-            (n_text,n_codes)=state[0]
-            print(f"解析进度:{100-100*len(n_text)/len(text):.2f}%")
-            state=state[1:]
-            ans_code=n_codes
-            if(n_text==""): break
-            single_succ=""
-            for name,sentence in Compoment.Cs.items():
-                if(sentence.no_start==True): continue
-                succ,textc,code,r_oplist=sentence.Rrcognize(n_text)
-                if(succ==True):
-                    state.append((textc,n_codes+code))
-                    single_succ=name
+        """
+        顶层解析循环：逐句匹配并累积语法树节点。
+        （已简化：去除了退化的状态列表模式，改为直接循环）
+        """
+        # 记录原始文本用于错误报告
+        Compoment.original_text = text
+        Compoment.deepest_fail_pos = 0
+        Compoment.deepest_fail_rule = ""
+        Compoment.deepest_fail_name = ""
+
+        original_len = len(text)
+        ans_code = list(codes)
+
+        while text != "":
+            progress = 100 - 100 * len(text) / original_len
+            print(f"解析进度:{progress:.2f}%")
+
+            matched = False
+            for name, sentence in Compoment.Cs.items():
+                if sentence.no_start:
+                    continue
+                succ, textc, code, r_oplist = sentence.Rrcognize(text)
+                if succ:
+                    text = textc
+                    ans_code += code
+                    matched = True
                     break
-            if(single_succ==""):    print("编译发生错误,当前编译位置",n_text if len(n_text)<50 else n_text[:50]+"...")
-        return single_succ!="",ans_code
+
+            if not matched:
+                # 增强错误报告：显示最远匹配位置
+                fail_pos = Compoment.deepest_fail_pos
+                context_start = max(0, fail_pos - 20)
+                context_end = min(len(Compoment.original_text), fail_pos + 30)
+                context = Compoment.original_text[context_start:context_end]
+                pointer_offset = fail_pos - context_start
+
+                print(f"\n{'='*60}")
+                print(f"编译错误!")
+                print(f"  位置: 字符 {fail_pos}/{original_len}")
+                print(f"  上下文: ...{context}...")
+                print(f"           {' '*pointer_offset}^ 此处失败")
+                print(f"  最后尝试的非终结符: {Compoment.deepest_fail_name}")
+                print(f"  最后尝试的规则: {Compoment.deepest_fail_rule}")
+                print(f"  当前待解析: {text[:50]}{'...' if len(text)>50 else ''}")
+                print(f"{'='*60}\n")
+                return False, ans_code
+
+        return True, ans_code
+
     def revise_config(self,original_str):
         pattern = r"<(.*?)>"
         matches = re.findall(pattern, original_str)
@@ -162,7 +219,7 @@ class Compiler:
         else: return i[:limits]+"..."
     def show_and_compile(self,node,code,prefix=""):
         codelists=[]
-        if(isinstance(node,tuple)):
+        if(isinstance(node, (tuple, ASTNode))):
             name=node[0]
             rule=node[1]
             oplist=node[2]
@@ -180,7 +237,6 @@ class Compiler:
                 code_list=codelists
             b_code=""
             b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
-            # print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(str(code_list))+"-->"+self.cut_str(source_text)+"-->"+b_code)
             code+=b_code
             return code
         else:   assert(1==0)
@@ -206,7 +262,3 @@ if __name__=="__main__":
     preprocessed_code=d.process(content)
     state,code=a.Complie_file(preprocessed_code)
     if state:print(code)
-    # code=c.process(code)
-    # with open("IR.txt", 'w', encoding='utf-8') as file:
-    #     file.write(code)
-    #b.Run_from_code(code.split("\n"))

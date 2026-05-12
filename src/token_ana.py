@@ -1,5 +1,27 @@
 #此数据结构用于记录各个token的属性
 from enum import Enum
+from dataclasses import dataclass, field
+from typing import List, Optional, Any
+
+# ============ AST 节点 dataclass ============
+@dataclass
+class ASTNode:
+    """语法树节点，替代原始 tuple 以提高可读性和类型安全"""
+    name: str           # 非终结符名（如 "ADD", "DIM", "IF" 等）
+    rule: str           # 匹配的规则字符串
+    oplist: list        # 操作数列表
+    children: list      # 子节点编译后的代码列表
+    source: str         # 源文本片段
+
+    def __getitem__(self, index):
+        """兼容旧 tuple 访问方式 node[0]..node[4]"""
+        return (self.name, self.rule, self.oplist, self.children, self.source)[index]
+
+    def __iter__(self):
+        """兼容旧 tuple 的迭代"""
+        return iter((self.name, self.rule, self.oplist, self.children, self.source))
+
+
 class y_code():
     def __init__(self):
         self.return_num=0
@@ -120,33 +142,24 @@ class varea:#用于实现 函数 变量和 结构体的 作用域 oplist仍然�
         return ans
     def __repr__(self):
         return self.__str__()
-    def find_area(self,area_name):#
-        bfs=[]
-        bfs.append(self.father)
-        bfs.append(self)
-        find_ans=None
-        while len(bfs)!=0:
-            tmp=bfs.pop()
-            if(tmp==None): continue
-            bfs.append(tmp.father)
-            if tmp.name==area_name:
-                find_ans=tmp
-                break
-        return find_ans
-    def find_token(self,name):#沿树寻找
-        bfs=[]
-        bfs.append(self.father)
-        bfs.append(self)
-        while len(bfs)!=0:
-            tmp=bfs.pop()
-            if(tmp==None): continue
-            bfs.append(tmp.father)
-            #if(area_name!=tmp.name): continue
-            if hasattr(tmp,"vars"):
-                for i in tmp.vars:
-                    if i.name==name:
-                        return i   
-        return None          
+    def find_area(self,area_name):
+        """沿父链向上搜索指定名称的作用域"""
+        current = self
+        while current is not None:
+            if current.name == area_name:
+                return current
+            current = current.father
+        return None
+    def find_token(self,name):
+        """沿父链向上逐层搜索变量（链式作用域查找）"""
+        current = self
+        while current is not None:
+            if hasattr(current, "vars"):
+                for var in current.vars:
+                    if var.name == name:
+                        return var
+            current = current.father
+        return None
 def test(area_tree):
     sub_area=area_tree.new_area(True) #添加子节点
     area_tree=sub_area #使得子节点成为当前节点
