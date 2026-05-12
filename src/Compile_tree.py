@@ -7,6 +7,9 @@ _loop_stack = []  # 每个元素 = {"break_placeholders": [], "continue_placehol
 # ============ 方法上下文栈（用于成员函数中的 this 指针）============
 _method_stack = []  # 每个元素 = {"struct_vars": list, "this_pos": int}
 
+# ============ 形参声明标志（用于数组参数的指针语义）============
+_in_param_declaration = False
+
 def _push_method(struct_vars, this_pos):
     """进入结构体方法时压栈"""
     _method_stack.append({"struct_vars": struct_vars, "this_pos": this_pos})
@@ -113,6 +116,21 @@ def _addr(area_tree, op):
                 search = search.father
             if var_top is not None and var_top is not current_top:
                 prefix = "%"
+
+            # 检测是否是参数数组（指针语义）
+            if getattr(tk, 'is_param_array', False):
+                # 参数数组：tk.start_pos 存储的是传入的基地址
+                # 访问 arr[i] = memory[memory[EBP + tk.start_pos] + i]
+                if idx_str.isdigit():
+                    return "~" + str(tk.start_pos) + ":" + idx_str
+                elif idx_str[0] == '-' and idx_str[1:].isdigit():
+                    return "~" + str(tk.start_pos) + ":" + idx_str
+                else:
+                    idx_tk = area_tree.find_token(idx_str)
+                    if idx_tk is not None and hasattr(idx_tk, "start_pos"):
+                        return "~" + str(tk.start_pos) + ":$" + str(idx_tk.start_pos)
+                return s
+
             if idx_str.isdigit():
                 # 常量下标：直接计算偏移
                 return prefix + str(tk.start_pos) + ":" + idx_str
@@ -324,9 +342,17 @@ def Complie(name, rule, oplist, codelist, area_tree):
         if rule == "$TYPE$$EMPTY$$TOKEN$":
             start_pos = area_tree.clac_current_pos()
             t = y_token()
-            t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
-            area_tree.append_var(t, t.size)
-            code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
+            dimensions = [int(i) for i in var[1:]]
+            if _in_param_declaration and len(dimensions) > 0:
+                # 形参数组：只分配 1 个位置（存储传入的基地址指针）
+                t.set_as_variable(var[0], 1, type_name, start_pos, dimensions)
+                t.is_param_array = True
+                area_tree.append_var(t, 1)
+                code = "ALLOC " + str(start_pos + 1) + "//" + type_name + "\n"
+            else:
+                t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, dimensions)
+                area_tree.append_var(t, t.size)
+                code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
 
         elif rule == "$TYPE$$EMPTY$$TOKEN$=$OPN$":
             # 常量/变量初始化: int a = 5; 或 int a = b;
@@ -717,20 +743,31 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 if var_top: break
                 search = search.father
             is_global = (var_top is not None and var_top is not current_top)
+            is_param_arr = getattr(tk, 'is_param_array', False)
         else:
             base_pos = 0
             is_global = False
+            is_param_arr = False
         
         if idx_has:
-            # 索引是表达式：先计算索引到 EAX
-            code = idx_code  # EAX = 索引表达式的值
-            if is_global:
+            if is_param_arr:
+                # 参数数组+表达式下标：EAX = memory[memory[EBP+base_pos] + idx_expr]
+                code = idx_code  # EAX = 索引表达式的值
+                code += "MOV EBX $" + str(base_pos) + "\n"  # EBX = 传入的基地址
+                code += "ADD EAX EBX\n"  # EAX = 基地址 + 索引
+                code += "LEA EAX EAX\n"  # EAX = memory[EAX]
+            elif is_global:
+                # 全局数组+表达式下标
+                code = idx_code
                 code += "ADD EAX " + str(base_pos) + "\n"
+                code += "LEA EAX EAX\n"
             else:
+                # 局部数组+表达式下标：EAX = memory[EBP + base_pos + idx_expr]
+                code = idx_code  # EAX = 索引表达式的值
                 code += "ADD EAX EBP\n"
                 if base_pos != 0:
                     code += "ADD EAX " + str(base_pos) + "\n"
-            code += "LEA EAX EAX\n"
+                code += "LEA EAX EAX\n"
         else:
             # 索引是简单变量/常量：直接用 _addr 格式
             idx_val = oplist[1] if len(oplist) > 1 else "0"
@@ -1048,6 +1085,13 @@ def Complie(name, rule, oplist, codelist, area_tree):
             if filtered.strip():
                 code += filtered + "\n"
         code += "NOP\n"
+        # 标记数组形参为 is_param_array（指针语义）
+        for v in area_tree.vars:
+            if v.kind == token_type.variable and hasattr(v, 'muti_dimension') and len(v.muti_dimension) > 0:
+                v.is_param_array = True
+                # 数组形参只占 1 个位置（存储基地址），不需要 N 个位置
+                # 但由于 DIM 已经分配了 N 个位置，这里调整大小
+                # 实际不影响正确性：ALLOC 被过滤了，调用端只 PUSH 了 1 个值
         pass
 
     elif name == "ARG":
@@ -1060,7 +1104,36 @@ def Complie(name, rule, oplist, codelist, area_tree):
         # tARG 递归处理参数列表 — 用 PUSH 压栈
         if rule == "$OPN$":
             addr = _addr(area_tree, oplist[0])
-            code = "PUSH " + addr + "\n"
+            # 检查是否是数组名（传引用）
+            tk = area_tree.find_token(oplist[0])
+            if tk is not None and hasattr(tk, 'muti_dimension') and len(tk.muti_dimension) > 0:
+                # 数组参数：传递绝对地址 = EBP + start_pos
+                # 检查是否是全局变量
+                current_top = area_tree.find_top_father()
+                search = area_tree
+                var_top = None
+                while search is not None:
+                    if hasattr(search, "vars"):
+                        for v in search.vars:
+                            if v is tk:
+                                var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                                break
+                    if var_top: break
+                    search = search.father
+                is_global = (var_top is not None and var_top is not current_top)
+                if is_global:
+                    # 全局数组：直接传绝对地址
+                    code = "PUSH " + str(tk.start_pos) + "\n"
+                elif getattr(tk, 'is_param_array', False):
+                    # 参数数组再次传递：直接传存储的基地址值
+                    code = "PUSH $" + str(tk.start_pos) + "\n"
+                else:
+                    # 局部数组：计算绝对地址 = EBP + start_pos
+                    code = "MOV EAX EBP\n"
+                    code += "ADD EAX " + str(tk.start_pos) + "\n"
+                    code += "PUSH EAX\n"
+            else:
+                code = "PUSH " + addr + "\n"
         elif rule == "$OP$":
             # 表达式参数：先计算（结果在EAX），然后PUSH
             real_code = codelist[0] if codelist else ""
@@ -1068,13 +1141,62 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code = real_code
                 code += "PUSH EAX\n"
             else:
-                # 简单常量/变量
-                addr = _addr(area_tree, oplist[0])
-                code = "PUSH " + addr + "\n"
+                # 简单常量/变量 — 检查是否是数组名
+                tk = area_tree.find_token(oplist[0])
+                if tk is not None and hasattr(tk, 'muti_dimension') and len(tk.muti_dimension) > 0:
+                    # 数组参数：传递绝对地址
+                    current_top = area_tree.find_top_father()
+                    search = area_tree
+                    var_top = None
+                    while search is not None:
+                        if hasattr(search, "vars"):
+                            for v in search.vars:
+                                if v is tk:
+                                    var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                                    break
+                        if var_top: break
+                        search = search.father
+                    is_global = (var_top is not None and var_top is not current_top)
+                    if is_global:
+                        code = "PUSH " + str(tk.start_pos) + "\n"
+                    elif getattr(tk, 'is_param_array', False):
+                        code = "PUSH $" + str(tk.start_pos) + "\n"
+                    else:
+                        code = "MOV EAX EBP\n"
+                        code += "ADD EAX " + str(tk.start_pos) + "\n"
+                        code += "PUSH EAX\n"
+                else:
+                    addr = _addr(area_tree, oplist[0])
+                    code = "PUSH " + addr + "\n"
         elif "$OPN$,$tARG$" in rule:
             # 先处理当前参数（OPN），再递归处理剩余参数
-            addr = _addr(area_tree, oplist[0])
-            code = "PUSH " + addr + "\n"
+            # 检查是否是数组名（传引用）
+            tk = area_tree.find_token(oplist[0])
+            if tk is not None and hasattr(tk, 'muti_dimension') and len(tk.muti_dimension) > 0:
+                # 数组参数：传递绝对地址
+                current_top = area_tree.find_top_father()
+                search = area_tree
+                var_top = None
+                while search is not None:
+                    if hasattr(search, "vars"):
+                        for v in search.vars:
+                            if v is tk:
+                                var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                                break
+                    if var_top: break
+                    search = search.father
+                is_global = (var_top is not None and var_top is not current_top)
+                if is_global:
+                    code = "PUSH " + str(tk.start_pos) + "\n"
+                elif getattr(tk, 'is_param_array', False):
+                    code = "PUSH $" + str(tk.start_pos) + "\n"
+                else:
+                    code = "MOV EAX EBP\n"
+                    code += "ADD EAX " + str(tk.start_pos) + "\n"
+                    code += "PUSH EAX\n"
+            else:
+                addr = _addr(area_tree, oplist[0])
+                code = "PUSH " + addr + "\n"
             # 递归部分
             if codelist:
                 code += codelist[0]
@@ -1082,12 +1204,38 @@ def Complie(name, rule, oplist, codelist, area_tree):
             # 先计算表达式参数
             real_code = codelist[0] if codelist else ""
             if real_code.strip() and real_code.strip() != "NOP":
+                # 可能是数组名通过 OP→FACTOR→UNARY→OPN→VAR 路径（无实际代码）
+                # 但此处 real_code 非空，说明是真正的表达式
                 code = real_code
                 code += "PUSH EAX\n"
             else:
-                # 简单常量/变量
-                addr = _addr(area_tree, oplist[0])
-                code = "PUSH " + addr + "\n"
+                # 简单常量/变量 — 检查是否是数组名
+                tk = area_tree.find_token(oplist[0])
+                if tk is not None and hasattr(tk, 'muti_dimension') and len(tk.muti_dimension) > 0:
+                    # 数组参数：传递绝对地址
+                    current_top = area_tree.find_top_father()
+                    search = area_tree
+                    var_top = None
+                    while search is not None:
+                        if hasattr(search, "vars"):
+                            for v in search.vars:
+                                if v is tk:
+                                    var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                                    break
+                        if var_top: break
+                        search = search.father
+                    is_global = (var_top is not None and var_top is not current_top)
+                    if is_global:
+                        code = "PUSH " + str(tk.start_pos) + "\n"
+                    elif getattr(tk, 'is_param_array', False):
+                        code = "PUSH $" + str(tk.start_pos) + "\n"
+                    else:
+                        code = "MOV EAX EBP\n"
+                        code += "ADD EAX " + str(tk.start_pos) + "\n"
+                        code += "PUSH EAX\n"
+                else:
+                    addr = _addr(area_tree, oplist[0])
+                    code = "PUSH " + addr + "\n"
             # 递归部分
             if len(codelist) > 1:
                 code += codelist[1]

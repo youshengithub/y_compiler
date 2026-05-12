@@ -79,6 +79,24 @@ class Runner:
             else:
                 # 单段 @pos（不太可能但防御性处理）
                 return "pos", this_addr
+        if text.startswith("~"):
+            # 参数数组间接寻址：~pos:idx → memory[memory[EBP + pos] + idx]
+            inner = text[1:]
+            parts = inner.split(":")
+            arr_pos = int(parts[0])
+            # 基地址 = memory[EBP + arr_pos]（传入的数组绝对地址）
+            base_addr = int(self.memory[int(self.memory[REGS["EBP"]]) + arr_pos])
+            if len(parts) == 2:
+                idx_part = parts[1]
+                if idx_part.startswith("$"):
+                    # 变量下标：memory[EBP + idx_var_pos]
+                    idx_var_pos = int(idx_part[1:])
+                    idx_val = int(self.memory[int(self.memory[REGS["EBP"]]) + idx_var_pos])
+                else:
+                    idx_val = int(idx_part)
+                return "pos", base_addr + idx_val
+            else:
+                return "pos", base_addr
         if("$"  in text):
             ans=0
             texts=text.split(":")
@@ -145,11 +163,14 @@ class Runner:
             if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
             if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)
             if(keywords[0]=="ALLOC"):
-                if(op1>=self.max_memory):
+                # ALLOC N: 确保栈帧至少到 EBP + N + 1
+                target = self.memory[REGS["EBP"]] + op1 + 1
+                if(target>=self.max_memory):
                     print("栈溢出！")
                     return 
                 else:
-                    self.memory[REGS["ESP"]]=op1+1
+                    if target > self.memory[REGS["ESP"]]:
+                        self.memory[REGS["ESP"]] = target
             elif(keywords[0]=="MOV"):
                 assert(flag1=="pos")
                 if(flag2=="pos"):

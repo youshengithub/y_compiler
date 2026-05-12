@@ -232,6 +232,9 @@ class Compiler:
             code_list=node[3]
             source_text=node[4]
             print(prefix+self.cut_str(name)+"-->"+self.cut_str(rule)+"-->"+self.cut_str(str(oplist))+"-->"+self.cut_str(source_text))
+            # 在处理形参声明的子节点前设置标志
+            if name in ("PAR", "tPAR"):
+                Compile_tree._in_param_declaration = True
             if(code_list!=[]):
                 for i in code_list:
                     t_code=""
@@ -240,6 +243,8 @@ class Compiler:
                         t_code+=b_code
                     codelists.append(t_code)  # 保留空代码占位符，保持与子树的位置对应
                 code_list=codelists
+            if name in ("PAR", "tPAR"):
+                Compile_tree._in_param_declaration = False
             b_code=""
             b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)
             code+=b_code

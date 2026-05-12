@@ -142,6 +142,13 @@ TEST_CASES = [
     ("t113_dim_expr_init.y",    "A",    False),
     ("t114_complex_judge.y",    "2",    False),
     ("t115_fib_nested_call.y",  "3",    False),
+
+    # ---- 数组作为函数参数 ----
+    ("t116_arr_param_read.y",   "D",    False),  # 数组参数读取
+    ("t117_arr_param_write.y",  "B",    False),  # 数组参数写入
+    ("t118_arr_param_pass.y",   "A",    False),  # 数组参数再传递
+    ("t119_arr_param_sort.y",   "1",    False),  # 数组参数排序
+    ("t120_global_arr_param.y", "C",    False),  # 全局数组参数
 ]
 
 _devnull = open(os.devnull, 'w')
@@ -162,7 +169,12 @@ def init_compiler():
     return compiler
 
 def compile_and_run(compiler, filepath):
+    Compoment.Cs = {}
     Compoment.unmatch = {}
+    _silence()
+    compiler.construct_componets(os.path.join(ROOT, "src", "Config.txt"))
+    _restore()
+
     with open(filepath, 'r', encoding='utf-8') as f:
         source = f.read()
 
