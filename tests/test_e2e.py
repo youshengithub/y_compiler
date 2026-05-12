@@ -125,6 +125,12 @@ TEST_CASES = [
     ("t98_switch_assign.y",     "B",    False),
     ("t99_method_loop.y",       "5",    False),
     ("t100_stack.y",            "CBA",  False),
+    # — 综合测试：方法进阶 + switch进阶 —
+    ("t101_method_if.y",        "Y",    False),
+    ("t102_multi_instance_method.y","BD",False),
+    ("t103_queue.y",            "AB",   False),
+    ("t104_switch_func.y",      "C",    False),
+    ("t105_state_machine.y",    "A",    False),
 ]
 
 _devnull = open(os.devnull, 'w')
