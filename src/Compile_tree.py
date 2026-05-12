@@ -146,10 +146,10 @@ def Complie(name,rule,oplist,codelist,area_tree):
             base=area_tree.clac_current_pos()
             t=y_token()
             t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
-            area_tree.append_var(t)
+            area_tree.append_var(t, length)
             for i in range(len(string)):
-                code+="MOV "+str(base)+":"+str(i)+" "+str(ord(string[i]))+ "\n"
-            code+="MOV "+str(base)+":"+str(len(string))+ " 0\n"
+                code+="MOV $"+str(base)+":"+str(i)+" "+str(ord(string[i]))+ "\n"
+            code+="MOV $"+str(base)+":"+str(len(string))+ " 0\n"
         else:
             print(oplist)
     elif(name=="OP"):
