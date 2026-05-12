@@ -314,6 +314,38 @@ def Complie(name, rule, oplist, codelist, area_tree):
         elif rule == "$CALL$":
             for i in codelist:
                 code += i
+        elif rule == "$TERNARY$":
+            for i in codelist:
+                code += i
+        pass
+
+    elif name == "TERNARY":
+        # (COND)?true_val:false_val
+        # codelist[0]=条件代码, codelist[1]=true表达式代码, codelist[2]=false表达式代码
+        cond_code = codelist[0] if len(codelist) > 0 else ""
+        true_code = codelist[1] if len(codelist) > 1 else ""
+        false_code = codelist[2] if len(codelist) > 2 else ""
+        cond_has = cond_code.strip() not in ("", "NOP")
+        true_has = true_code.strip() not in ("", "NOP")
+        false_has = false_code.strip() not in ("", "NOP")
+        # 条件判断
+        code = cond_code
+        # true/false 分支代码块
+        true_block = ""
+        if true_has:
+            true_block = true_code
+        else:
+            true_block = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+        false_block = ""
+        if false_has:
+            false_block = false_code
+        else:
+            false_block = "MOV EAX " + _addr(area_tree, oplist[-1]) + "\n"
+        # JPIF 跳过 true_block + JMP（+2：JMP自身和true_block行数）
+        code += "JPIF " + str(true_block.count("\n") + 2) + "\n"
+        code += true_block
+        code += "JMP " + str(false_block.count("\n") + 1) + "\n"
+        code += false_block
         pass
 
     elif name == "TOKEN":

@@ -48,7 +48,49 @@ except ImportError:
 
 class Runner:
     def __init__(self) -> None:
-        pass
+        self.debug_mode = False
+        self.breakpoints = set()  # 行号集合
+        self.step_mode = False    # 单步执行
+        self.perf_counter = {}    # 指令 → 执行次数
+        self.total_instructions = 0
+        self.max_stack_depth = 0
+
+    def set_debug(self, enabled=True):
+        """启用/禁用调试模式"""
+        self.debug_mode = enabled
+
+    def add_breakpoint(self, line):
+        """添加断点"""
+        self.breakpoints.add(line)
+
+    def remove_breakpoint(self, line):
+        """删除断点"""
+        self.breakpoints.discard(line)
+
+    def get_perf_stats(self):
+        """获取性能统计"""
+        return {
+            "total_instructions": self.total_instructions,
+            "instruction_counts": dict(sorted(self.perf_counter.items(), key=lambda x: -x[1])),
+            "max_stack_depth": self.max_stack_depth,
+        }
+
+    def dump_memory(self, start=0, count=20):
+        """打印内存内容"""
+        print(f"  Memory[{start}:{start+count}]:")
+        for i in range(start, min(start+count, len(self.memory))):
+            val = self.memory[i]
+            if val != 0:
+                print(f"    [{i}] = {int(val)}", end="")
+                if 32 <= int(val) <= 126:
+                    print(f"  ('{chr(int(val))}')", end="")
+                print()
+
+    def dump_registers(self, REGS):
+        """打印寄存器"""
+        print("  Registers:")
+        for name, addr in REGS.items():
+            print(f"    {name} = {int(self.memory[addr])}")
     def calc_pos(self,text,REGS): #通过此来计算和数据
         if text.startswith("@"):
             # 间接寻址：通过 this 指针访问结构体成员
@@ -147,18 +189,61 @@ class Runner:
             keywordss.append(line.split(" "))
         print("**********execing*********")
         start_time = time.time()
+        self.perf_counter = {}
+        self.total_instructions = 0
+        self.max_stack_depth = 0
         while(True):
             
             ip=self.memory[REGS["EIP"]]
             if(ip>=len(lines)):
                 break
             keywords=keywordss[ip]
-            # for i in keywords:
-            #     print(i,end="")
-            #     print(" ",end="")
-            # print("")
-            #print(ip)
-            #print("正在执行:",keywords)
+
+            # ── 性能计数 ──
+            self.total_instructions += 1
+            instr_name = keywords[0]
+            self.perf_counter[instr_name] = self.perf_counter.get(instr_name, 0) + 1
+            # 追踪最大栈深度
+            current_esp = int(self.memory[REGS["ESP"]])
+            if current_esp > self.max_stack_depth:
+                self.max_stack_depth = current_esp
+
+            # ── 调试模式 ──
+            if self.debug_mode:
+                if int(ip) in self.breakpoints or self.step_mode:
+                    print(f"\n  ⏸ Break at line {int(ip)}: {' '.join(keywords)}")
+                    self.dump_registers(REGS)
+                    while True:
+                        cmd = input("  debug> ").strip()
+                        if cmd == "" or cmd == "n" or cmd == "next":
+                            self.step_mode = True
+                            break
+                        elif cmd == "c" or cmd == "continue":
+                            self.step_mode = False
+                            break
+                        elif cmd == "r" or cmd == "regs":
+                            self.dump_registers(REGS)
+                        elif cmd.startswith("m") or cmd.startswith("mem"):
+                            parts = cmd.split()
+                            start_addr = int(parts[1]) if len(parts) > 1 else 0
+                            count = int(parts[2]) if len(parts) > 2 else 20
+                            self.dump_memory(start_addr, count)
+                        elif cmd == "s" or cmd == "stack":
+                            ebp = int(self.memory[REGS["EBP"]])
+                            esp = int(self.memory[REGS["ESP"]])
+                            print(f"  Stack (EBP={ebp}, ESP={esp}):")
+                            self.dump_memory(ebp, esp - ebp + 1)
+                        elif cmd == "q" or cmd == "quit":
+                            return
+                        elif cmd == "p" or cmd == "perf":
+                            stats = self.get_perf_stats()
+                            print(f"  Instructions executed: {stats['total_instructions']}")
+                            print(f"  Max stack depth: {stats['max_stack_depth']}")
+                            top5 = list(stats['instruction_counts'].items())[:5]
+                            for name, cnt in top5:
+                                print(f"    {name}: {cnt}")
+                        else:
+                            print("  Commands: n(ext), c(ontinue), r(egs), m(em) [addr] [count], s(tack), p(erf), q(uit)")
 
             if(len(keywords)>=2):flag1,op1=self.calc_pos(keywords[1],REGS)
             if(len(keywords)>=3):flag2,op2=self.calc_pos(keywords[2],REGS)

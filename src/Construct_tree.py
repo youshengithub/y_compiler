@@ -99,6 +99,7 @@ class Compoment:
         r_code=[]
         while(repeat): #规则必须也是寻找最有可能的匹配
             repeat=False
+            best_match = None  # (text_remaining, oplist, code_list, rule)
             for rule in self.configs:#通过语句构建,这个选择一种规则！
                 textc=text
                 # 使用 hash(text) 作为缓存键，节省内存（text可能很长）
@@ -107,25 +108,30 @@ class Compoment:
                     if(Compoment.unmatch[key]=="PROCESSING"): #陷入重入
                         succ=False
                     else:
-                        succ,text,oplist,code_list=Compoment.unmatch[key]
+                        succ,text_r,oplist,code_list=Compoment.unmatch[key]
                 else:
                     Compoment.unmatch[key]="PROCESSING"
-                    succ,text,oplist,code_list=self.HandleR(rule,textc) #这里面没有传入代码 
-                    Compoment.unmatch[key]=(succ,text,oplist,code_list,)
-                if(succ): 
-                    flag=True
-                    repeat=self.repeat
-                    r_oplist=oplist
-                    # 使用 ASTNode dataclass 替代原始 tuple
-                    compiled_code=[ASTNode(
-                        name=self.name,
-                        rule=rule,
-                        oplist=oplist,
-                        children=code_list,
-                        source=textc[0:len(textc)-len(text)]
-                    )]
-                    r_code+=compiled_code
-                    break
+                    succ,text_r,oplist,code_list=self.HandleR(rule,textc) #这里面没有传入代码 
+                    Compoment.unmatch[key]=(succ,text_r,oplist,code_list,)
+                if(succ):
+                    # 选择消耗最多字符的匹配（最长匹配）
+                    consumed = len(textc) - len(text_r)
+                    if best_match is None or consumed > best_match[0]:
+                        best_match = (consumed, text_r, oplist, code_list, rule, textc)
+            if best_match is not None:
+                _, text, oplist, code_list, rule, textc = best_match
+                flag=True
+                repeat=self.repeat
+                r_oplist=oplist
+                # 使用 ASTNode dataclass 替代原始 tuple
+                compiled_code=[ASTNode(
+                    name=self.name,
+                    rule=rule,
+                    oplist=oplist,
+                    children=code_list,
+                    source=textc[0:len(textc)-len(text)]
+                )]
+                r_code+=compiled_code
         return flag,text,r_code,r_oplist
 class Compiler:
     def __init__(self) -> None:

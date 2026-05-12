@@ -316,13 +316,192 @@ class Preprocesser:
         return ans
 
     # ─────────────────────────────────────────────
+    #  字符字面量 'A' → 65
+    # ─────────────────────────────────────────────
+    def process_char_literals(self, text):
+        """将 'X' 字符字面量替换为对应的 ASCII 值"""
+        # 处理转义字符
+        escape_map = {
+            r"'\n'": "10", r"'\t'": "9", r"'\r'": "13",
+            r"'\0'": "0", r"'\\'": "92", r"'\''": "39",
+            r"'\"'": "34",
+        }
+        for pat, val in escape_map.items():
+            text = text.replace(pat, val)
+        # 处理普通单字符 'X'
+        result = []
+        i = 0
+        while i < len(text):
+            if text[i] == "'" and i + 2 < len(text) and text[i+2] == "'":
+                # 'X' → ord(X)
+                result.append(str(ord(text[i+1])))
+                i += 3
+            else:
+                result.append(text[i])
+                i += 1
+        return ''.join(result)
+
+    # ─────────────────────────────────────────────
+    #  连续减法/除法左结合化
+    # ─────────────────────────────────────────────
+    def process_chain_ops(self, text):
+        """将连续减法 a-b-c 转为 (a-b)-c，连续除法同理。
+        只处理赋值右侧的表达式中的连续运算符。
+        """
+        import re
+        # 对每个语句(;分隔)做处理
+        result = []
+        for stmt in text.split(";"):
+            # 找赋值号位置（排除 == <= >= !=）
+            eq_pos = -1
+            i = 0
+            while i < len(stmt):
+                if stmt[i] == '=' and (i == 0 or stmt[i-1] not in '<>!=') and (i+1 >= len(stmt) or stmt[i+1] != '='):
+                    eq_pos = i
+                    break
+                i += 1
+            if eq_pos >= 0:
+                left = stmt[:eq_pos+1]
+                right = stmt[eq_pos+1:]
+                right = self._parenthesize_chain(right, "-")
+                right = self._parenthesize_chain(right, "/")
+                stmt = left + right
+            result.append(stmt)
+        return ";".join(result)
+
+    def _parenthesize_chain(self, expr, op):
+        """对表达式中连续的op运算符添加括号实现左结合。
+        例如 10-3-2 → (10-3)-2
+        """
+        if expr.count(op) < 2:
+            return expr
+        # 找到所有顶层op的位置（不在括号/方括号内）
+        positions = []
+        depth = 0
+        i = 0
+        while i < len(expr):
+            c = expr[i]
+            if c in ('(', '['):
+                depth += 1
+            elif c in (')', ']'):
+                depth -= 1
+            elif c == op and depth == 0:
+                # 排除负号/除法：前面是运算符或赋值号或开头
+                if i == 0:
+                    i += 1
+                    continue
+                prev = expr[i-1]
+                if prev in ('(', ',', '+', '-', '*', '/', '%', '<', '>', '!', '&', '|', '^', '='):
+                    i += 1
+                    continue
+                positions.append(i)
+            i += 1
+        if len(positions) < 2:
+            return expr
+        # 从左到右，每遇到第二个op就给前面的部分加括号
+        # 10-3-2: positions=[2,4] → "(10-3)-2"
+        result = expr
+        offset = 0
+        for k in range(1, len(positions)):
+            pos = positions[k] + offset
+            result = "(" + result[:pos] + ")" + result[pos:]
+            offset += 2
+        return result
+
+    # ─────────────────────────────────────────────
+    #  enum 枚举类型（预处理展开为 #define）
+    # ─────────────────────────────────────────────
+    def process_enum(self, text):
+        """将 enum { A, B=5, C } 展开为一系列 #define"""
+        result = []
+        lines = text.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+            if stripped.startswith("enum"):
+                # 收集完整的 enum 声明（可能跨多行）
+                enum_text = stripped
+                while '{' not in enum_text or '}' not in enum_text:
+                    i += 1
+                    if i < len(lines):
+                        enum_text += " " + lines[i].strip()
+                    else:
+                        break
+                # 解析 enum { A, B=5, C };
+                body_match = re.search(r'\{([^}]*)\}', enum_text)
+                if body_match:
+                    body = body_match.group(1)
+                    members = [m.strip() for m in body.split(",") if m.strip()]
+                    value = 0
+                    for member in members:
+                        if '=' in member:
+                            name, val = member.split('=', 1)
+                            name = name.strip()
+                            value = int(val.strip())
+                        else:
+                            name = member.strip()
+                        # 生成 #define
+                        result.append(f"#define {name} {value}")
+                        value += 1
+            else:
+                result.append(line)
+            i += 1
+        return "\n".join(result)
+
+    # ─────────────────────────────────────────────
+    #  typedef（预处理展开为类型别名替换）
+    # ─────────────────────────────────────────────
+    def process_typedef(self, text):
+        """处理 typedef old_type new_name; → 文本替换"""
+        typedefs = {}  # new_name → old_type
+        result = []
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("typedef"):
+                # typedef int size_t;
+                parts = stripped[len("typedef"):].strip().rstrip(";").rsplit(None, 1)
+                if len(parts) == 2:
+                    old_type, new_name = parts
+                    typedefs[new_name.strip()] = old_type.strip()
+                continue
+            # 对代码行做类型别名替换
+            for new_name, old_type in typedefs.items():
+                line = re.sub(r'\b' + re.escape(new_name) + r'\b', old_type, line)
+            result.append(line)
+        return "\n".join(result)
+
+    # ─────────────────────────────────────────────
+    #  const 常量声明（预处理展开为 #define）
+    # ─────────────────────────────────────────────
+    def process_const(self, text):
+        """将 const int X = 100; 转换为 #define X 100"""
+        result = []
+        for line in text.split("\n"):
+            stripped = line.strip()
+            # const int NAME = VALUE;
+            m = re.match(r'^const\s+\w+\s+(\w+)\s*=\s*(.+?)\s*;', stripped)
+            if m:
+                name = m.group(1)
+                value = m.group(2)
+                result.append(f"#define {name} {value}")
+            else:
+                result.append(line)
+        return "\n".join(result)
+
+    # ─────────────────────────────────────────────
     #  主入口
     # ─────────────────────────────────────────────
     def process(self, text):
         """完整预处理流水线"""
         text = self.process_include(text)
         text = self.process_conditional(text)   # 条件编译（#ifdef 等）
-        text = self.process_define(text)
-        text = self.process_note(text)
-        text = self.process_space(text)
+        text = self.process_enum(text)          # enum 展开
+        text = self.process_typedef(text)       # typedef 替换
+        text = self.process_const(text)         # const → #define
+        text = self.process_define(text)        # #define 宏替换
+        text = self.process_note(text)          # 注释删除
+        text = self.process_char_literals(text) # 'A' → 65
+        text = self.process_chain_ops(text)     # a-b-c → (a-b)-c 左结合化
+        text = self.process_space(text)         # 空格处理
         return text

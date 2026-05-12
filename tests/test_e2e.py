@@ -164,6 +164,20 @@ TEST_CASES = [
     ("t131_include_guard.y",    "A",    False),  # include 防重复
     ("t132_pow.y",              "@",    False),  # pow_int
     ("t133_isqrt.y",            "7",    False),  # isqrt
+    # — 新功能测试 —
+    ("t134_char_literal.y",     "A",    False),  # 字符字面量
+    ("t135_char_literal_calc.y","C",    False),  # 字符字面量计算
+    ("t136_enum_basic.y",       "B",    False),  # enum 枚举
+    ("t137_enum_value.y",       "A",    False),  # enum 指定值
+    ("t138_typedef.y",          "A",    False),  # typedef
+    ("t139_const.y",            "A",    False),  # const
+    ("t140_ternary.y",          ":",    False),  # 三元运算符 true (10+48=58=':')
+    ("t141_ternary_false.y",    "8",    False),  # 三元运算符 false (8+48=56='8')
+    ("t142_for_dim.y",          ":",    False),  # for中DIM (10+48=58=':')
+    ("t143_chain_sub.y",        "5",    False),  # 连续减法 (5+48=53='5')
+    ("t144_chain_sub_var.y",    "<",    False),  # 变量连续减法 (12+48=60='<')
+    ("t145_const_fold.y",       "7",    False),  # 常量折叠 (7+48=55='7')
+    ("t146_perf_counter.y",     ":",    False),  # 性能计数 (10+48=58=':')
 ]
 
 _devnull = open(os.devnull, 'w')
