@@ -274,11 +274,14 @@ class Runner:
                 continue
             elif(keywords[0]=="OUT"):
                 if(flag1=="pos"):
-                    pass
                     print(chr(int(self.memory[op1])),end="",flush=True)
                 else:
-                    pass
                     print(chr(int(op1)),end="",flush=True)
+            elif(keywords[0]=="OUTNUM"):
+                if(flag1=="pos"):
+                    print(int(self.memory[op1]),end="",flush=True)
+                else:
+                    print(int(op1),end="",flush=True)
             elif(keywords[0]=="IN"):
                 char = _getch()
                 assert(flag1=="pos")

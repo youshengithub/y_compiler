@@ -34,7 +34,7 @@ class Compoment:
                     text=text[match.regs[0][1]:]  
                     rule=rule[2+len(pattern):]  
                     if(self.name=="VAR"): #需要进行判断是什么词性
-                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","else","func","return","struct","int","double","continue"] :
+                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","outnum","else","func","return","struct","int","double","continue","break","switch","case","default"] :
                             return False,text_c,oplist,codelist
                         oplist.append(match_text)
                     elif(self.name=="CONST" ):
@@ -46,7 +46,7 @@ class Compoment:
                     elif(self.name=="TYPE"):
                         oplist.append(match.group(0)) #直接把类型放进去
                     elif(self.name=="TOKEN"):
-                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","else","func","return","struct","continue"] :
+                        if match_text in ["struct","class","void","in","asm","if","do","while","for","out","outnum","else","func","return","struct","continue","break","switch","case","default"] :
                             return False,text_c,oplist,codelist
                         oplist.append(match_text) #直接把token放进去
                 else:
@@ -232,8 +232,7 @@ class Compiler:
                     for j in i:
                         b_code=self.show_and_compile(j,"",prefix+" ")
                         t_code+=b_code
-                    if(t_code!=""):
-                        codelists.append(t_code)
+                    codelists.append(t_code)  # 保留空代码占位符，保持与子树的位置对应
                 code_list=codelists
             b_code=""
             b_code,self.area_tree=Compile_tree.Complie(name,rule,oplist,code_list,self.area_tree)

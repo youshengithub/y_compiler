@@ -1,26 +1,40 @@
 import re
 from src.token_ana import *
+
+# ============ 循环上下文栈（用于 break/continue）============
+_loop_stack = []  # 每个元素 = {"break_placeholders": [], "continue_placeholders": []}
+
+def _push_loop():
+    _loop_stack.append({"break_placeholders": [], "continue_placeholders": []})
+
+def _pop_loop():
+    return _loop_stack.pop()
+
+def _in_loop():
+    return len(_loop_stack) > 0
+
 def call_function():
     pass
-def process_var(code,op):
-    if(op.isdigit()):
-        return "int","",op
+
+def process_var(code, op):
+    if op.isdigit():
+        return "int", "", op
     else:
-        index=code.rfind('/')
-        if(index==-1):
+        index = code.rfind('/')
+        if index == -1:
             print("var处理错误")
-            assert(1==0)
-        return code[index+1:-1],code,"$EAX"
+            assert(1 == 0)
+        return code[index+1:-1], code, "$EAX"
+
 def _addr(area_tree, op):
-    """把 oplist 的字符串元素翻译为 runner 能识别的操作数。
-    数字、寄存器名、已带 $/%/@ 的串原样返回；裸标识符若能在符号表里查到变量，则用 $start_pos% 表示绝对地址。"""
+    """把 oplist 的字符串元素翻译为 runner 能识别的操作数。"""
     s = str(op)
     if s == "" or s.isdigit():
         return s
     # 负数常量
     if len(s) > 1 and s[0] == '-' and s[1:].isdigit():
         return s
-    # 已经是寄存器名 / $.. / %.. / @.. 之一
+    # 已经是寄存器名
     if s in ("EAX", "EBX", "ESP", "EBP", "EIP", "EFG", "ETP"):
         return s
     if s[0] in ("$", "%", "@"):
@@ -34,469 +48,707 @@ def _addr(area_tree, op):
         return "$" + str(tk.start_pos)
     return s
 
-def Complie(name,rule,oplist,codelist,area_tree):
-    code=""
-    if(name=="VAR"): 
-        if not oplist[0] in ["EAX","EBX","ESP","EBP","EIP","EFG","ETP"]:
-            # 简单标量（无下标 / 字段访问）不需要在 VAR 阶段生成代码——
-            # EQUAL/PRINT/算术节点会通过 _addr() 直接把名字翻译为 $start_pos。
+
+def _resolve_break_continue(code, loop_info, step_lines=0):
+    """回填 break/continue 的 JMP 占位符
+    step_lines: 步进代码的行数（FOR循环中continue需要跳到步进代码而非末尾JMP）
+    """
+    lines = code.split("\n")
+    total_lines = len([l for l in lines if l != ""])
+    result_lines = []
+    line_idx = 0
+    for line in lines:
+        if line == "":
+            result_lines.append(line)
+            continue
+        if line == "JMP BREAK_PLACEHOLDER":
+            # break 跳到循环末尾之后
+            jump_offset = total_lines - line_idx
+            result_lines.append("JMP " + str(jump_offset))
+        elif line == "JMP CONTINUE_PLACEHOLDER":
+            # continue: 跳到步进代码开头（距末尾 step_lines + 1 行之前）
+            # FOR: step_lines > 0, continue 跳到 total_lines - step_lines - 1
+            # WHILE/DO: step_lines = 0, continue 跳到回跳JMP（total_lines - 1）
+            target_line = total_lines - step_lines - 1
+            jump_offset = target_line - line_idx
+            result_lines.append("JMP " + str(jump_offset))
+        else:
+            result_lines.append(line)
+        line_idx += 1
+    return "\n".join(result_lines)
+
+
+def Complie(name, rule, oplist, codelist, area_tree):
+    code = ""
+    if name == "VAR":
+        if not oplist[0] in ["EAX", "EBX", "ESP", "EBP", "EIP", "EFG", "ETP"]:
             if "[" not in oplist[0] and "." not in oplist[0]:
                 return code, area_tree
-            var=y_token.trans_var(oplist[0])
-            base=0
-            #ESP的位置用于存储temp变量 #找到变量所在的域 查看起始位置
-            code+="MOV EAX 0\n"
-            for id,i in enumerate(var):
-                if(id==0):
-                    find_var=area_tree.find_token(i[0]) #看一看是啥子类型
-                else:#好像就是find_var不一样
-                    find_flag=False
-                    for var in find_type.vars:
-                        if(var.name==i[0]):
-                            find_var=var
-                            find_flag=True
+            var = y_token.trans_var(oplist[0])
+            base = 0
+            code += "MOV EAX 0\n"
+            for id, i in enumerate(var):
+                if id == 0:
+                    find_var = area_tree.find_token(i[0])
+                else:
+                    find_flag = False
+                    for v in find_type.vars:
+                        if v.name == i[0]:
+                            find_var = v
+                            find_flag = True
                             break
                     if not find_flag:
                         print(f"类型{find_type.name}不包含{i[0]}变量")
-                        assert(1==0)
-                
-                if(find_var==None):
-                    print("变量未定义",oplist[0],"--->",i[0])
-                    assert(1==0)
-                
-                find_type=area_tree.find_token(find_var.type)
-                assert(find_type!=None)
-                if(len(i[1:])!=len(find_var.muti_dimension)):
-                    print("维度不匹配 ",oplist[0],"--->",i[0]," 变量原始维度:",len(find_var.muti_dimension),"变量引用维度:",len(i)-1)
-                    assert(1==0)
-                base=find_var.start_pos
-                if(base!=0): code+="ADD EAX "+str(base)+"\n"#加上基地址
-                accumulate_demension=[]
-                current=1
+                        assert(1 == 0)
+
+                if find_var is None:
+                    print("变量未定义", oplist[0], "--->", i[0])
+                    assert(1 == 0)
+
+                find_type = area_tree.find_token(find_var.type)
+                assert(find_type is not None)
+                if len(i[1:]) != len(find_var.muti_dimension):
+                    print("维度不匹配 ", oplist[0], "--->", i[0])
+                    assert(1 == 0)
+                base = find_var.start_pos
+                if base != 0:
+                    code += "ADD EAX " + str(base) + "\n"
+                accumulate_demension = []
+                current = 1
                 for demension in reversed(find_var.muti_dimension):
                     accumulate_demension.append(current)
-                    current*=demension
-                accumulate_demension=[i*find_type.size for  i  in reversed(accumulate_demension)] #对齐进行修正 计算正确的大小
-                for index in range(len(find_var.muti_dimension)) :
-                    #需要判断是j是数字还是变量
-                    if(i[index+1].isdigit()):
-                        if(int(i[index+1])>=find_var.muti_dimension[index]): #合法下标 0..dim-1
-                            print("维度超过限制 ",oplist[0],"--->",i[0],"的第",index,"维,变量原始维度:",find_var.muti_dimension[index],"变量引用维度:",int(i[index+1]))
-                            assert(1==0)
-                        code+="MOV EBX "+i[index+1]+"\n"
+                    current *= demension
+                accumulate_demension = [i * find_type.size for i in reversed(accumulate_demension)]
+                for index in range(len(find_var.muti_dimension)):
+                    if i[index+1].isdigit():
+                        if int(i[index+1]) >= find_var.muti_dimension[index]:
+                            print("维度超过限制")
+                            assert(1 == 0)
+                        code += "MOV EBX " + i[index+1] + "\n"
                     else:
-                        find_var=area_tree.find_token(i[index+1]) 
-                        if(find_var==None):
-                            print("变量未定义",oplist[0],"--->",i[index+1])
-                            assert(1==0)
-                        elif(find_var.type!="int"):
-                            print("下标只能为int",oplist[0],"--->",i[index+1])
-                            assert(1==0)
-                        code+="MOV EBX $"+str(find_var.start_pos)+"\n"
-                    code+="MUL EBX "+str(accumulate_demension[index])+"\n"
-                    code+="ADD EAX EBX\n"
-                        #寻找到变量位置                 
-                #最后 EAX就是变量的位置！ EBX为左值 EAX为右值
-            code=code[:-1]+"//"+find_type.name+"\n" #在最后记录一下这个类型的名字方便后面使用 
-    elif(name=="OPN"):
-        if(rule=="$CONST$"):
-            code+="NOP\n"
+                        idx_var = area_tree.find_token(i[index+1])
+                        if idx_var is None:
+                            print("变量未定义", oplist[0], "--->", i[index+1])
+                            assert(1 == 0)
+                        code += "MOV EBX $" + str(idx_var.start_pos) + "\n"
+                    code += "MUL EBX " + str(accumulate_demension[index]) + "\n"
+                    code += "ADD EAX EBX\n"
+            code = code[:-1] + "//" + find_type.name + "\n"
+
+    elif name == "OPN":
+        if rule == "$CONST$":
             pass
-        elif(rule=="$VAR$"):
+        elif rule == "$VAR$":
             pass
-        elif(rule=="($OPN$)"):
-            pass
-        pass    
-    elif(name=="TOKEN"):#不需要对其进行修正 
+        elif rule == "($OP$)":
+            for i in codelist:
+                code += i
         pass
-    elif(name=="CONST"):
+
+    elif name == "TOKEN":
         pass
-    elif(name=="AREA"):
-        for i in codelist:code+=i
-        if(rule=="$AREA_S$$AREA_E$"): code+="NOP\n"
-    elif(name=="REGS"):
+    elif name == "CONST":
         pass
-    elif(name=="DIM"): #这里要产生巨变！
-        type=oplist[0]
-        #解析一下a[10][10]这种类型的
-        var=y_token.trans_token(oplist[1])
-        num=1
-        for i in var[1:]: num*=int(i)
-        find_type=area_tree.find_token(type)
-        # find_var=area_tree.find_token(var[0])
-        # if(find_var!=None):
-        #     print("重定义符号",var[0])
-        #     assert(1==0)
-        if(find_type==None):
-            print("编译出错,类型未定义")
-            assert("1==0")
-        if(rule=="$TYPE$$EMPTY$$TOKEN$"): #进行解析
-            start_pos=area_tree.clac_current_pos()
-            t=y_token()
-            t.set_as_variable(var[0],find_type.size*num,type,start_pos,[int(i) for i in var[1:]])
-            area_tree.append_var(t,t.size) #只有变量才会分配区域大小
-            code="ALLOC "+str(t.size)+"//"+type+"\n" #
-        elif(rule=="$TYPE$$EMPTY$$TOKEN$=$STRING$"):
-            assert(type=="int" or type=="double")
-            string=oplist[2]
-            length=num
-            if(length<len(string)):
-                length=len(string)
-            code="ALLOC "+str(length)+"//"+type+"\n"  
-            base=area_tree.clac_current_pos()
-            t=y_token()
-            t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
+    elif name == "AREA":
+        for i in codelist:
+            code += i
+        if rule == "$AREA_S$$AREA_E$":
+            code += "NOP\n"
+    elif name == "REGS":
+        pass
+
+    elif name == "DIM":
+        type_name = oplist[0]
+        var = y_token.trans_token(oplist[1])
+        num = 1
+        for i in var[1:]:
+            num *= int(i)
+        find_type = area_tree.find_token(type_name)
+        if find_type is None:
+            print("编译出错,类型未定义:", type_name)
+            assert(1 == 0)
+
+        if rule == "$TYPE$$EMPTY$$TOKEN$":
+            start_pos = area_tree.clac_current_pos()
+            t = y_token()
+            t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
+            area_tree.append_var(t, t.size)
+            code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
+
+        elif rule == "$TYPE$$EMPTY$$TOKEN$=$OPN$":
+            # 常量/变量初始化: int a = 5; 或 int a = b;
+            start_pos = area_tree.clac_current_pos()
+            t = y_token()
+            t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
+            area_tree.append_var(t, t.size)
+            code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
+            code += "MOV $" + str(start_pos) + " " + _addr(area_tree, oplist[2]) + "\n"
+
+        elif rule == "$TYPE$$EMPTY$$TOKEN$=$OP$":
+            # 表达式初始化: int a = b + c; 或 int a = 65;
+            start_pos = area_tree.clac_current_pos()
+            t = y_token()
+            t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
+            area_tree.append_var(t, t.size)
+            code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
+            real_code = codelist[0] if codelist else ""
+            if real_code.strip() not in ("", "NOP"):
+                # 有实际表达式代码，结果在 EAX
+                code += real_code
+                code += "MOV $" + str(start_pos) + " EAX\n"
+            else:
+                # 简单常量/变量，直接 MOV
+                code += "MOV $" + str(start_pos) + " " + _addr(area_tree, oplist[2]) + "\n"
+
+        elif rule == "$TYPE$$EMPTY$$TOKEN$=$STRING$":
+            assert(type_name == "int" or type_name == "double")
+            string = oplist[2]
+            length = num
+            if length < len(string):
+                length = len(string)
+            code = "ALLOC " + str(length) + "//" + type_name + "\n"
+            base = area_tree.clac_current_pos()
+            t = y_token()
+            t.set_as_variable(var[0], find_type.size * num, type_name, base, [int(i) for i in var[1:]])
             area_tree.append_var(t, length)
+            code = "ALLOC " + str(base + length) + "//" + type_name + "\n"
             for i in range(len(string)):
-                code+="MOV $"+str(base)+":"+str(i)+" "+str(ord(string[i]))+ "\n"
-            code+="MOV $"+str(base)+":"+str(len(string))+ " 0\n"
+                code += "MOV $" + str(base) + ":" + str(i) + " " + str(ord(string[i])) + "\n"
+            code += "MOV $" + str(base) + ":" + str(len(string)) + " 0\n"
         else:
-            print(oplist)
-    elif(name=="OP"):
-        for i in codelist: code+=i 
+            print("DIM unhandled rule:", rule, oplist)
+
+    elif name == "OP":
+        for i in codelist:
+            code += i
         pass
-    elif(name=="ADD"):
-        if(rule=="$OPN$+$OPN$"):
-            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
-            code+="ADD EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule=="$OPN$+$OP$"):
-            code=codelist[0]
-            code+="ADD EAX "+_addr(area_tree,oplist[0])+"\n"
-        elif(rule=="$OP$+$OPN$"):
-            code=codelist[0]
-            code+="ADD EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(rule=="$OP$+$OP$"):
-            code=codelist[1]
-            code+="MOV EBX EAX\n"
-            code+=codelist[0]
-            code+="ADD EAX EBX\n"
+    elif name == "FACTOR":
+        for i in codelist:
+            code += i
+    elif name == "UNARY":
+        for i in codelist:
+            code += i
+
+    elif name == "ADD":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "ADD EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            # 右表达式(EAX)，左叶子 → ADD 交换律
+            code = right_code
+            code += "ADD EAX " + _addr(area_tree, oplist[0]) + "\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "ADD EAX " + _addr(area_tree, oplist[-1]) + "\n"
         else:
-            assert(1==0)
-    elif(name=="SUB"):
-        if(rule=="$OPN$-$OPN$"):
-            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
-            code+="SUB EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule=="$OPN$-$OP$"):
-            code=codelist[0]
-            code+="MOV EBX "+_addr(area_tree,oplist[0])+"\n"
-            code+="SUB EBX EAX\n"
-            code+="MOV EAX EBX\n"
-        elif(rule=="$OP$-$OPN$"):
-            code=codelist[0]
-            code+="SUB EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(rule=="$OP$-$OP$"):
-            code=codelist[1]
-            code+="MOV EBX EAX\n"
-            code+=codelist[0]
-            code+="SUB EAX EBX\n"
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "ADD EAX EBX\n"
+
+    elif name == "SUB":
+        # codelist[0]=左子树代码, codelist[1]=右子树代码（含空占位符）
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            # 两边都是叶子
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SUB EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            # 左叶子，右表达式(EAX) → left - EAX
+            code = right_code
+            code += "MOV EBX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SUB EBX EAX\n"
+            code += "MOV EAX EBX\n"
+        elif left_has and not right_has:
+            # 左表达式(EAX)，右叶子
+            code = left_code
+            code += "SUB EAX " + _addr(area_tree, oplist[-1]) + "\n"
         else:
-            assert(1==0)
-    elif(name=="MUL"): #注意到可能会被修正成代码！ op可能会被修正成位置
-        if(rule=="$OPN$*$OPN$"):
-            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
-            code+="MUL EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule=="$OPN$*$OP$"):
-            code=codelist[0]
-            code+="MUL EAX "+_addr(area_tree,oplist[0])+"\n"
-        elif(rule=="$OP$*$OPN$"):
-            code=codelist[0]
-            code+="MUL EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(rule=="$OP$*$OP$"):
-            code=codelist[1]
-            code+="MOV EBX EAX\n"
-            code+=codelist[0]
-            code+="MUL EAX EBX\n"
+            # 两边都是表达式：先算右→EBX，再算左→EAX
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "SUB EAX EBX\n"
+
+    elif name == "MUL":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "MUL EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            code = right_code
+            code += "MUL EAX " + _addr(area_tree, oplist[0]) + "\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "MUL EAX " + _addr(area_tree, oplist[-1]) + "\n"
         else:
-            assert(1==0)
-    elif(name=="DIV"):
-        if(rule=="$OPN$/$OPN$"):
-            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
-            code+="DIV EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule=="$OPN$/$OP$"):
-            code=codelist[0]
-            code+="MOV EBX "+_addr(area_tree,oplist[0])+"\n"
-            code+="DIV EBX EAX\n"
-            code+="MOV EAX EBX\n"
-        elif(rule=="$OP$/$OPN$"):
-            code=codelist[0]
-            code+="DIV EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(rule=="$OP$/$OP$"):
-            code=codelist[1]
-            code+="MOV EBX EAX\n"
-            code+=codelist[0]
-            code+="DIV EAX EBX\n"
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "MUL EAX EBX\n"
+
+    elif name == "DIV":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "DIV EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            # 左叶子 / 右表达式(EAX)
+            code = right_code
+            code += "MOV EBX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "DIV EBX EAX\n"
+            code += "MOV EAX EBX\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "DIV EAX " + _addr(area_tree, oplist[-1]) + "\n"
         else:
-            assert(1==0)
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "DIV EAX EBX\n"
+
     elif(name=="AND" or name=="XOR" or name=="OR"):
-        if(bool(re.match("\\$OPN\\$.+\\$OPN\\$", rule))):
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
             code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
             code+=name+" EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(bool(re.match("\\$OPN\\$.+\\$OP\\$", rule))):
-            code=codelist[0]
+        elif not left_has and right_has:
+            code=right_code
             code+=name+" EAX "+_addr(area_tree,oplist[0])+"\n"
-        elif(bool(re.match("\\$OP\\$.+\\$OPN\\$", rule))):
-            code=codelist[0]
+        elif left_has and not right_has:
+            code=left_code
             code+=name+" EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(bool(re.match("\\$OP\\$.+\\$OP\\$", rule))):
-            # AND/OR/XOR 交换律可保留旧写法
-            code=codelist[0]
+        else:
+            code=right_code
             code+="MOV EBX EAX\n"
-            code+=codelist[1]
+            code+=left_code
             code+=name+" EAX EBX\n"
-        else:
-            assert(1==0)
-    elif(name=="MOD"):
-        # MOD 非交换：必须保证 EAX = 左, EBX = 右, 然后 MOD EAX EBX (= EAX %= EBX)
-        if(bool(re.match("\\$OPN\\$.+\\$OPN\\$", rule))):
-            code="MOV EAX "+_addr(area_tree,oplist[0])+"\n"
-            code+="MOD EAX "+_addr(area_tree,oplist[1])+"\n"
-        elif(bool(re.match("\\$OPN\\$.+\\$OP\\$", rule))):
-            # 左是 OPN，右是 OP（codelist[0] 为右子树代码，结果在 EAX）
-            code=codelist[0]
-            code+="MOV EBX EAX\n"           # EBX = 右
-            code+="MOV EAX "+_addr(area_tree,oplist[0])+"\n"  # EAX = 左
-            code+="MOD EAX EBX\n"
-        elif(bool(re.match("\\$OP\\$.+\\$OPN\\$", rule))):
-            # 左是 OP（已在 EAX），右是 OPN
-            code=codelist[0]
-            code+="MOD EAX "+_addr(area_tree,oplist[-1])+"\n"
-        elif(bool(re.match("\\$OP\\$.+\\$OP\\$", rule))):
-            # 沿用 SUB 的写法：先算右、暂存，再算左
-            code=codelist[1]                # 右 → EAX
-            code+="MOV EBX EAX\n"           # 右 → EBX
-            code+=codelist[0]               # 左 → EAX
-            code+="MOD EAX EBX\n"
-        else:
-            assert(1==0)
 
-    elif(name=="NOT"): #处理单目运算符
-        if(rule=="!$OPN$"):
-            code="NOT EAX "+_addr(area_tree,oplist[0])+"\n"
-        elif(rule=="!$OP$"):
-            code=codelist[0]
-            code+="MOV EBX EAX\n"
-            code+="NOT EAX EBX\n"
+    elif name == "MOD":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "MOD EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            # 左叶子 % 右表达式(EAX)
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "MOD EAX EBX\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "MOD EAX " + _addr(area_tree, oplist[-1]) + "\n"
         else:
-            pass
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "MOD EAX EBX\n"
+
+    elif name == "NOT":
+        if rule == "!$OPN$":
+            code = "NOT EAX " + _addr(area_tree, oplist[0]) + "\n"
+        elif rule == "!$OP$":
+            code = codelist[0]
+            code += "MOV EBX EAX\n"
+            code += "NOT EAX EBX\n"
         pass
-    elif(name=="GETP"):
-        code+="LEA EAX "+str(oplist[0])+"\n"
+
+    elif name == "GETP":
+        code += "LEA EAX " + str(oplist[0]) + "\n"
         pass
-    elif(name=="SETP"):
-        if(rule=="*$OPN$"): #在此处对oplist进行修正！ or 插入指令  #总是会把计算压入stack
-            code+="PUSH "+str(oplist[0])+"\n"
-            #oplist=[]
-            #code="SEA  EAX" +str(oplist[0])+"\n"
-            pass
-        elif(rule=="*$OP$"):#eax是需要修正的结果 不支持 EBX也可能被人用掉了！ 我需要一个不会被人用掉的寄存器或者位置！
-            for i in codelist: code+=i #PUSH EBX POP
-            code+="PUSH EAX\n"
-            pass
+
+    elif name == "SETP":
+        if rule == "*$OPN$":
+            code += "PUSH " + str(oplist[0]) + "\n"
+        elif rule == "*$OP$":
+            for i in codelist:
+                code += i
+            code += "PUSH EAX\n"
+        pass
+
+    elif name == "EQUAL":
+        real_codes = [c for c in codelist if c.strip() not in ("", "NOP")]
+
+        # 复合赋值运算符
+        if "+=" in rule:
+            if len(real_codes) > 0:
+                code = real_codes[-1]
+                code += "ADD EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "ADD EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "-=" in rule:
+            if len(real_codes) > 0:
+                code = real_codes[-1]
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SUB EAX EBX\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SUB EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "*=" in rule:
+            if len(real_codes) > 0:
+                code = real_codes[-1]
+                code += "MUL EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "MUL EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "/=" in rule:
+            if len(real_codes) > 0:
+                code = real_codes[-1]
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "DIV EAX EBX\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "DIV EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "%=" in rule:
+            if len(real_codes) > 0:
+                code = real_codes[-1]
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "MOD EAX EBX\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "MOD EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "=$OPN$" in rule or (len(real_codes) == 0 and "$SETP$" not in rule):
+            code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
+        elif "$VAR$" in rule.split('=')[0]:
+            code = real_codes[-1] if real_codes else ""
+            code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "$SETP$" in rule.split('=')[0]:
+            if len(real_codes) <= 1:
+                for i in codelist:
+                    code += i
+                code += "POP EBX\n"
+                code += "SEA EBX " + str(oplist[-1]) + "\n"
+            else:
+                for i in codelist:
+                    code += i
+                code += "POP EBX\n"
+                code += "SEA EBX EAX\n"
+        pass
+
+    elif name == "INCR":
+        # i++ → 变量值 +1
+        addr = _addr(area_tree, oplist[0])
+        code = "MOV EAX " + addr + "\n"
+        code += "ADD EAX 1\n"
+        code += "MOV " + addr + " EAX\n"
+
+    elif name == "DECR":
+        # i-- → 变量值 -1
+        addr = _addr(area_tree, oplist[0])
+        code = "MOV EAX " + addr + "\n"
+        code += "SUB EAX 1\n"
+        code += "MOV " + addr + " EAX\n"
+
+    elif name == "BREAK":
+        code = "JMP BREAK_PLACEHOLDER\n"
+
+    elif name == "CONTINUE":
+        code = "JMP CONTINUE_PLACEHOLDER\n"
+
+    elif name == "SENTENCE":
+        for i in codelist:
+            code += i
+        pass
+
+    elif name == "JUDGE":
+        # 顺序：先匹配 <=/>=/==/!= 再匹配 < / >
+        if rule.find("<=") != -1:
+            code = "LE " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+        elif rule.find(">=") != -1:
+            code = "GE " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+        elif rule.find("==") != -1:
+            code = "EQUAL " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+        elif rule.find("!=") != -1:
+            code = "EQUAL " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+            code += "RF\n"
+        elif rule.find("<") != -1:
+            code = "LESS " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+        elif rule.find(">") != -1:
+            code = "GREATER " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[1]) + "\n"
+        elif rule.find("&&") != -1:
+            code = codelist[0]
+            code += "JPIF " + str((codelist[1]).count("\n") + 1) + "\n"
+            code += codelist[1]
+        elif rule.find("||") != -1:
+            code = codelist[0]
+            code += "JPNIF " + str((codelist[1]).count("\n") + 1) + "\n"
+            code += codelist[1]
         else:
-            pass
-        pass
-    elif(name=="EQUAL"):
-        #可能会有code针对左边的地方进行计算！
-        if(rule=="$VAR$=$OPN$"):
-            code="MOV "+_addr(area_tree,oplist[0]) +" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule=="$VAR$=$OP$"):   
-            code=codelist[0]
-            code+= "MOV "+_addr(area_tree,oplist[0])  + " EAX\n"
-        elif(rule=="$SETP$=$OPN$"):  #这里可能会有点问题 
-            for i in codelist: code+=i 
-            code+="POP EBX\n"
-            code+="SEA EBX "+str(oplist[-1])+"\n" #这里的oplist不一定多少个数据
-            pass
-        elif(rule=="$SETP$=$OP$"):
-            for i in codelist: code+=i 
-            code+="POP EBX\n"
-            code+="SEA EBX EAX\n"
-            pass
+            for i in codelist:
+                code += i
+
+    elif name == "IF":
+        code = codelist[0]
+        if len(codelist) >= 3:
+            code += "JPIF " + str((codelist[1]).count("\n") + 2) + "\n"
+            code += codelist[1]
+            code += "JMP " + str((codelist[2]).count("\n") + 1) + "\n"
+            code += codelist[2]
         else:
-            pass
+            code += "JPIF " + str((codelist[1]).count("\n") + 1) + "\n"
+            code += codelist[1]
         pass
-    elif(name=="SENTENCE"):
-        for i in codelist: code+=i 
+
+    elif name == "DO":
+        _push_loop()
+        code = codelist[0] + codelist[1]
+        code += "RF\n"
+        code += "JPIF -" + str((codelist[0] + codelist[1]).count("\n") + 1) + "\n"
+        loop_info = _pop_loop()
+        code = _resolve_break_continue(code, loop_info)
         pass
-    elif(name=="JUDGE"):
-        # 顺序很重要：先匹配 <=/>=/==/!= 这些两字符运算符，再匹配 < / >
-        if(rule.find("<=")!=-1):
-            code="LE "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule.find(">=")!=-1):
-            code="GE "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule.find("==")!=-1):
-            code="EQUAL "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule.find("!=")!=-1):
-            code="EQUAL "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-            code+="RF\n"
-        elif(rule.find("<")!=-1):
-            code="LESS "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule.find(">")!=-1):
-            code="GREATER "+_addr(area_tree,oplist[0])+" "+_addr(area_tree,oplist[1])+"\n"
-        elif(rule.find("&&")!=-1):
-            code=codelist[0]
-            code+="JPIF "+str((codelist[1]).count("\n")+1)+"\n"
-            code+=codelist[1]
-        elif(rule.find("||")!=-1):
-            code=codelist[0] #如果不是这样的就跳转到末尾
-            code+="JPNIF "+str((codelist[1]).count("\n")+1)+"\n"
-            code+=codelist[1]
+
+    elif name == "WHILE":
+        _push_loop()
+        code = codelist[0]
+        code += "JPIF " + str(codelist[1].count("\n") + 2) + "\n"
+        code += codelist[1]
+        code += "JMP -" + str((codelist[0] + codelist[1]).count("\n") + 1) + "\n"
+        loop_info = _pop_loop()
+        code = _resolve_break_continue(code, loop_info)
+        pass
+
+    elif name == "FOR":
+        _push_loop()
+        code = codelist[0] + codelist[1]
+        code += "JPIF " + str((codelist[3] + codelist[2]).count("\n") + 2) + "\n"
+        code += codelist[3] + codelist[2]
+        code += "JMP -" + str((codelist[1] + codelist[3] + codelist[2]).count("\n") + 1) + "\n"
+        loop_info = _pop_loop()
+        step_lines = len([l for l in codelist[2].split("\n") if l.strip()])
+        code = _resolve_break_continue(code, loop_info, step_lines=step_lines)
+        pass
+
+    elif name == "PRINT":
+        # 支持 out($OP$) 和 out($OPN$)
+        if len(codelist) > 0 and codelist[0].strip():
+            code = codelist[0]
+            code += "OUT EAX\n"
         else:
-            for i in codelist: code+=i 
-    elif(name=="IF"):
-        code=codelist[0]
-        if(len(codelist)>=3):
-            # if-else: JUDGE + BODY + ELSE_BODY
-            code+="JPIF "+str((codelist[1]).count("\n")+2)+"\n"
-            code+=codelist[1]
-            code+="JMP "+str((codelist[2]).count("\n")+1)+"\n"
-            code+=codelist[2]
+            code = "OUT " + _addr(area_tree, oplist[0]) + "\n"
+        pass
+
+    elif name == "OUTNUM":
+        # 输出数字（需要转为字符串）
+        if len(codelist) > 0 and codelist[0].strip():
+            code = codelist[0]
+            code += "OUTNUM EAX\n"
         else:
-            # 纯 if（无 else）: JUDGE + BODY
-            code+="JPIF "+str((codelist[1]).count("\n")+1)+"\n"
-            code+=codelist[1]
+            code = "OUTNUM " + _addr(area_tree, oplist[0]) + "\n"
         pass
-    elif(name=="DO"):
-        code=codelist[0]+codelist[1]
-        code+="RF\n"
-        code+="JPIF -"+str((codelist[0]+codelist[1]).count("\n")+1)+"\n"
+
+    elif name == "IN":
+        code = "IN EAX\n"
+
+    elif name == "FUNCNAME":
+        sub_area = area_tree.new_area(True, oplist[0])
+        area_tree = sub_area
         pass
-    elif(name=="WHILE"):
-        code=codelist[0]
-        code+="JPIF "+str(codelist[1].count("\n")+2)+"\n"
-        code+=codelist[1]
-        code+="JMP -"+str((codelist[0]+codelist[1]).count("\n")+1)+"\n"
-        pass
-    elif(name=="FOR"):
-        #需要看一看有没有3
-        code=codelist[0]+codelist[1]
-        code+="JPIF "+str((codelist[3]+codelist[2]).count("\n")+2)+"\n"
-        code+=codelist[3]+codelist[2]
-        code+="JMP -"+str((codelist[1]+codelist[3]+codelist[2]).count("\n")+1)+"\n"
-        
-        pass
-    elif(name=="PRINT"):
-        code="OUT "+_addr(area_tree,oplist[0])+"\n"
-        pass
-    elif(name=="IN"):
-        code="IN EAX\n"
-    elif(name=="FUNCNAME"): #funcname/structure_name
-        sub_area=area_tree.new_area(True,oplist[0])
-        area_tree=sub_area#创建顶级域 在AREA的时候恢复顶级域
-        pass#在这里就要创建新的顶级域了
-    elif(name=="FUNC"):#在定义的时候，不要执行语句
-        for i in codelist: code+=i #注意到这里已经完成了赋值 这里面分了三段
-        revise_code=code.split("\n")[:-1]
-        code=""
+
+    elif name == "FUNC":
+        for i in codelist:
+            code += i
+        revise_code = code.split("\n")[:-1]
+        code = ""
         for i in range(len(revise_code)):
-            toend=len(revise_code)-i
-            revise_code[i]=revise_code[i].replace("END",str(toend))
-            code=code+revise_code[i]+"\n"
-        #需要把code里面的END全部替换掉！
-        code+="MOV ESP $0:-6\n"
-        code+="MOV EBX $0:-3\n"
-        code+="MOV EFG $0:-2\n"
-        code+="MOV ETP $0:-1\n" #不用再跳转了！这里已经写好了参数了！ 注意到这里有一个坑按道理来说必须同时还原,
-        code+="MOV EBP $0:-5\n" #使用临时寄存器ETP暂时保存该跳转的结果。
-        code+="MOV EIP ETP\n"
-        code="JMP "+str(code.count("\n")+1)+"\n"+code
-        code="ALLOC @"+oplist[1]+"\n"+code
-        area_tree=area_tree.father
-        #在codelist[0]里面解析double
-        t=y_token()
-        par=[]
+            toend = len(revise_code) - i
+            revise_code[i] = revise_code[i].replace("END", str(toend))
+            code = code + revise_code[i] + "\n"
+        # 函数尾声：恢复寄存器（注意：不恢复 EAX，EAX 作为返回值通道）
+        code += "MOV ESP $0:-6\n"
+        code += "MOV EBX $0:-3\n"
+        code += "MOV EFG $0:-2\n"
+        code += "MOV ETP $0:-1\n"
+        code += "MOV EBP $0:-5\n"
+        code += "MOV EIP ETP\n"
+        code = "JMP " + str(code.count("\n") + 1) + "\n" + code
+        code = "ALLOC @" + oplist[1] + "\n" + code
+        area_tree = area_tree.father
+        # 解析形参
+        t = y_token()
+        par = []
         for i in codelist[0].split("\n"):
-            if(i!="" and len(i.split("//"))==2):
-                par.append(i.split("//")[1])  
-        t.set_as_function(oplist[0],oplist[1],par)
+            if i != "" and len(i.split("//")) == 2:
+                par.append(i.split("//")[1])
+        t.set_as_function(oplist[0], oplist[1], par)
         area_tree.append_var(t)
-        #code=codelist[0] #还没处理return问题嘞
         pass
-    elif(name=="CALL"):#call 然后eax传入参数！
-        #oplist[1] 就是标签名 base+最高， 然后把参数都move过去 然后base-最高，就ok了！
-        #保存ESP和EBP
-        #这里不能这样计算 EAX无用了 因为不会被恢复
-        code="MOV EAX ESP\n"
-        code+="SUB EAX EBP\n"
-        code+="MOV $0:EAX ESP\n"
-        code+="MOV $1:EAX EBP\n"
-        code+="MOV $2:EAX EAX\n"
-        code+="MOV $3:EAX EBX\n"
-        code+="MOV $4:EAX EFG\n"
-        code+="MOV EBX EAX\n" #保存一下我要压ip的时候用
-        
-        code+="ADD ESP 6\n"
-        code+="MOV ETP ESP\n"
-        code+=codelist[0] #压入参数 EAX EBX 可用 EBP ETP 可用否？
-        
-        code+="MOV EAX EIP\n"
-        code+="ADD EAX 4\n"
-        code+="MOV $5:EBX EAX\n"#最后才来压入eip! 不行 这里的EAX的值g了
-        
-        code+="MOV EBP ETP\n" #压完了参数再给ebp复制
-        code+="JMP @"+oplist[0]+"\n" #这里需要绝对地址！
-        #然后需要执行跳转！
+
+    elif name == "CALL":
+        # 检测方法调用 obj.method()
+        if rule == "$TOKEN$.$CALL$":
+            # 成员方法调用 — obj.method(args)
+            # oplist[0] 是对象名（外层TOKEN），内层CALL递归处理
+            # 这里需要把对象基地址作为隐式参数传入
+            obj_name = oplist[0]
+            obj_tk = area_tree.find_token(obj_name)
+            if obj_tk is not None:
+                # 获取对象的结构体类型
+                struct_tk = area_tree.find_token(obj_tk.type)
+                if struct_tk is not None and struct_tk.kind == token_type.structure:
+                    # 在 codelist[0] 中已经有了内层 CALL 的代码
+                    # 我们需要先压入对象基地址作为隐式第一个参数
+                    # 但当前架构下内层CALL已经生成了完整代码
+                    # 简单处理：直接使用内层CALL代码
+                    for i in codelist:
+                        code += i
+                else:
+                    for i in codelist:
+                        code += i
+            else:
+                for i in codelist:
+                    code += i
+        else:
+            # 普通函数调用
+            # 保存寄存器
+            code = "MOV EAX ESP\n"
+            code += "SUB EAX EBP\n"
+            code += "MOV $0:EAX ESP\n"
+            code += "MOV $1:EAX EBP\n"
+            code += "MOV $2:EAX EAX\n"
+            code += "MOV $3:EAX EBX\n"
+            code += "MOV $4:EAX EFG\n"
+            code += "MOV EBX EAX\n"  # 保存偏移
+
+            code += "ADD ESP 6\n"
+            code += "MOV ETP ESP\n"
+            # 压入参数
+            if len(codelist) > 0:
+                code += codelist[0]
+
+            code += "MOV EAX EIP\n"
+            code += "ADD EAX 4\n"
+            code += "MOV $5:EBX EAX\n"
+
+            code += "MOV EBP ETP\n"
+            code += "JMP @" + oplist[0] + "\n"
         pass
-    # elif(name=="AREA_S"):
-    #     sub_area=area_tree.new_area(False,"None")
-    #     area_tree=sub_area#创建顶级域 在AREA的时候恢复顶级域        
-    #     #在这里分配作用域
-    #     pass
-    # elif(name=="AREA_E"):
-    #     area_tree=area_tree.father
-    #     #在这里分配作用域
-    #     pass
-    elif(name=="tPAR"):#这里是
-        for i in codelist: code+=i
+
+    elif name == "tPAR":
+        for i in codelist:
+            code += i
         pass
-    elif(name=="PAR"):#这里是形参
-        #code="SUB EBP 1\n" #不太需要动EBP
-        for i in codelist: code+=i
-        code+="NOP\n"
+
+    elif name == "PAR":
+        for i in codelist:
+            code += i
+        code += "NOP\n"
         pass
-    elif(name=="ARG"): #这里是call的实参  只能使用EAX了 但是我又需要计算op op的值必须要存在eax里面
-        #可以使用EAX 但是在算数的时候可能会使用任意参数啊！ 不要把EBX算数寄存器拿来用作控制！
-        code="MOV EAX ESP\n"
-        code+="SUB EAX EBP\n"
-        if(rule=="$OPN$"):
-            code+="MOV $0:EAX "+oplist[0]+"\n"
-            
-        elif(rule=="$OP$"):
-            print("NOT_SUPPORT")
-            assert(1==0)
-            code+="MOV $0:EAX "+oplist[0]+"\n"
+
+    elif name == "ARG":
+        # 实参处理：透传 tARG 的代码
+        for i in codelist:
+            code += i
+        pass
+
+    elif name == "tARG":
+        # tARG 递归处理参数列表
+        if rule == "$OPN$":
+            code = "MOV EAX ESP\n"
+            code += "SUB EAX EBP\n"
+            code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "ADD ESP 1\n"
+        elif rule == "$OP$":
+            # 表达式参数：先计算（结果在EAX），然后存入参数位置
+            code = codelist[0] if codelist else ""
+            code += "MOV EBX EAX\n"  # 暂存表达式结果
+            code += "MOV EAX ESP\n"
+            code += "SUB EAX EBP\n"
+            code += "MOV $0:EAX EBX\n"
+            code += "ADD ESP 1\n"
+        elif "$OPN$,$tARG$" in rule:
+            # 先处理当前参数（OPN），再递归处理剩余参数
+            code = "MOV EAX ESP\n"
+            code += "SUB EAX EBP\n"
+            code += "MOV $0:EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "ADD ESP 1\n"
+            # 递归部分
+            if codelist:
+                code += codelist[0]
+        elif "$OP$,$tARG$" in rule:
+            # 先计算表达式参数
+            code = codelist[0] if codelist else ""
+            code += "MOV EBX EAX\n"
+            code += "MOV EAX ESP\n"
+            code += "SUB EAX EBP\n"
+            code += "MOV $0:EAX EBX\n"
+            code += "ADD ESP 1\n"
+            # 递归部分
+            if len(codelist) > 1:
+                code += codelist[1]
+        else:
+            for i in codelist:
+                code += i
+        pass
+
+    elif name == "RETURN":
+        if "$OP$" in rule:
+            for i in codelist:
+                code += i
+        elif "$OPN$" in rule:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
         else:
             pass
-        code+="ADD ESP 1\n"   
+        code += "JMP END\n"
         pass
-    elif(name=="RETURN"):
-        if("$OP$" in rule):
-            for i in codelist: code+=i #JMP到最后才行！ 这里怎么写最后啊！
-        elif("$OPN$" in rule):
-            code="MOV EAX "+oplist[0]+"\n"
-        else:
-            pass 
-        code+="JMP END\n"# 等到func来填充这个就可以了哦
+
+    elif name == "TYPE":
         pass
-    elif(name=="TYPE"):
-        pass
-    elif(name=="STRUCTURE"):
-        t=y_token()
-        func=[]
-        vars=[]
-        struture=[]
+
+    elif name == "STRUCTURE":
+        t = y_token()
+        func = []
+        vars_list = []
+        struture = []
         for i in area_tree.vars:
-            if(i.kind==token_type.function): func.append(i)
-            elif(i.kind==token_type.structure): struture.append(i)
-            else: vars.append(i)
-        t.set_as_structure(oplist[0],area_tree.clac_current_pos(),func,vars)
-        area_tree=area_tree.father
-        if(area_tree.find_token(t.name)!=None):
-            print(t.name,"结构体已经被定义")
-            assert(1==0)
-        area_tree.append_var(t)#判断要不要插入这个区域 如果要插入的话 判断是不
-        
-    elif(name=="ASM"):
-        code+=oplist[0].replace("\\n","\n")
+            if i.kind == token_type.function:
+                func.append(i)
+            elif i.kind == token_type.structure:
+                struture.append(i)
+            else:
+                vars_list.append(i)
+        t.set_as_structure(oplist[0], area_tree.clac_current_pos(), func, vars_list)
+        area_tree = area_tree.father
+        if area_tree.find_token(t.name) is not None:
+            print(t.name, "结构体已经被定义")
+            assert(1 == 0)
+        area_tree.append_var(t)
+
+    elif name == "ASM":
+        code += oplist[0].replace("\\n", "\n")
         pass
-    return code,area_tree
+
+    return code, area_tree

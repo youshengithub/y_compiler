@@ -2,6 +2,15 @@ import re
 class Preprocesser:
     pass
     def process_note(self,text):
+        # 先处理多行注释 /* ... */
+        while '/*' in text:
+            start = text.find('/*')
+            end = text.find('*/', start + 2)
+            if end == -1:
+                text = text[:start]  # 未闭合则删到末尾
+            else:
+                text = text[:start] + text[end + 2:]
+        # 再处理单行注释 //
         content=""
         file=text.split("\n")
         for line in file:
@@ -62,25 +71,27 @@ class Preprocesser:
                 result.append(char)
         return ''.join(result)
     def remove_spaces_around_symbols(self,s):
+        # 只保留"字母数字 字母数字"之间的空格
+        # 其他所有空格（符号前/符号后）都删掉
         result=[]
-        last_char_was_non_alpha_numeric = None
-        
-        for char in s:
-            # 检查当前字符是否为空格
-            if char.isspace():
-                # 如果前一个字符是非字母数字，则跳过此空格
-                if last_char_was_non_alpha_numeric:
-                    continue
-                # 否则，添加空格到结果
-                else:
-                    result.append(char)
+        i = 0
+        while i < len(s):
+            if s[i].isspace():
+                # 向前看：前一个字符是字母数字，后一个字符也是字母数字 → 保留
+                if result and result[-1].isalnum():
+                    # 找到下一个非空格字符
+                    j = i + 1
+                    while j < len(s) and s[j].isspace():
+                        j += 1
+                    if j < len(s) and s[j].isalnum():
+                        result.append(' ')
+                # 否则跳过空格
+                i += 1
+                while i < len(s) and s[i].isspace():
+                    i += 1
             else:
-                # 非空格字符，直接添加到结果
-                result.append(char)
-                # 更新标志位
-                last_char_was_non_alpha_numeric = not char.isalnum()
-        
-        # 返回处理后的字符串
+                result.append(s[i])
+                i += 1
         return ''.join(result)
     def process_space(self,text): #这样处理会失去边界定义需要换一条句子dim-> 表示 to这个怎么样 我觉得还行
         pre=self.remove_spaces_outside_quotes(text.replace('\n', '').replace('\t', ''))

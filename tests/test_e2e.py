@@ -2,11 +2,6 @@
 """
 === 端到端 .y 源代码测试 ===
 
-每个测试用例都是一个 .y 源代码文件，走完整的编译流水线：
-  预处理 → 语法分析 → 代码生成 → 后处理 → 虚拟机执行
-
-验证输出是否与期望一致。
-
 运行方式：
   cd y_compiler
   python tests/test_e2e.py
@@ -14,17 +9,19 @@
 import os
 import sys
 import io
-import contextlib
 import traceback
+import signal
 
-# ============ 环境准备 ============
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-# ============ 测试用例定义 ============
-# (文件名, 期望输出)
-# (文件名, 期望输出, skip标记)
-# skip=True 的用例为已知限制，不计入失败
+from src.Construct_tree import Compiler, Compoment
+from src.postprocesser import Postprocesser
+from src.preprocesser import Preprocesser
+from src.runner import Runner
+
+TIMEOUT_SEC = 5  # 每个测试最多5秒
+
 TEST_CASES = [
     ("t01_assign_out.y",    "A",    False),
     ("t02_add.y",           "A",    False),
@@ -46,62 +43,76 @@ TEST_CASES = [
     ("t18_compound.y",      "Z",    False),
     ("t19_string.y",        "A",    False),
     ("t20_asm.y",           "A",    False),
-    ("t21_func.y",          "A",    True),   # 已知限制：函数参数传递未完成
+    ("t21_func.y",          "A",    True),   # 已知限制: 函数参数传递未完成
     ("t22_define.y",        "A",    False),
     ("t23_nested_loop.y",   "9",    False),
     ("t24_multi_out.y",     "OK",   False),
     ("t25_sum.y",           "6",    False),
+    ("t26_precedence_mul_add.y", "7", False),
+    ("t27_precedence_mul_sub.y", "4", False),  # 优先级已修复
+    ("t28_precedence_paren.y",   "9", False),  # 优先级已修复
+    ("t29_precedence_div_add.y", "4", False),
+    ("t30_precedence_mixed.y",   "8", False),
+    ("t31_func_return.y",       "A",    True),   # 已知限制: 函数返回值未完成
+    ("t32_dim_init.y",          "A",    False),
+    ("t33_dim_expr_init.y",     "A",    True),   # 已知限制: DIM不支持表达式初始化
+    ("t34_compound_add.y",      "A",    False),
+    ("t35_compound_sub.y",      "A",    False),
+    ("t36_compound_mul.y",      "A",    False),
+    ("t37_incr.y",              "A",    False),
+    ("t38_decr.y",              "A",    False),
+    ("t39_break.y",             "3",    False),
+    ("t40_continue.y",          "2",    False),
+    ("t41_outnum.y",            "65",   False),
+    ("t42_multiline_comment.y", "A",    False),
+    ("t43_struct.y",            "AB",   True),   # 已知限制: 结构体字段地址未实现
+    ("t44_while_break.y",       "1",    False),
+    ("t45_func_multi_args.y",   "A",    True),   # 已知限制: 多参数函数调用未完成
+    ("t46_out_expr.y",          "A",    False),
+    ("t47_for_incr.y",          ":",    False),
+    ("t48_outnum_expr.y",       "100",  False),
+    ("t49_compound_div_mod.y",  "6",    False),
 ]
 
-# ============ 编译并运行单个文件 ============
-def compile_and_run_file(filepath):
-    """
-    编译并运行一个 .y 源文件，返回 (success, stdout_output, error_msg)
-    """
-    from src.Construct_tree import Compiler, Compoment
-    from src.postprocesser import Postprocesser
-    from src.preprocesser import Preprocesser
-    from src.runner import Runner
+_devnull = open(os.devnull, 'w')
 
-    # 每次重置编译器状态
+def _silence():
+    sys.stdout = _devnull
+
+def _restore():
+    sys.stdout = sys.__stdout__
+
+def init_compiler():
     Compoment.Cs = {}
     Compoment.unmatch = {}
-
     compiler = Compiler()
-    config_path = os.path.join(ROOT, "src", "Config.txt")
+    _silence()
+    compiler.construct_componets(os.path.join(ROOT, "src", "Config.txt"))
+    _restore()
+    return compiler
 
-    # 加载语法配置（静默）
-    old_stdout = sys.stdout
-    sys.stdout = io.StringIO()
-    try:
-        compiler.construct_componets(config_path)
-    finally:
-        sys.stdout = old_stdout
-
-    # 读取源文件
+def compile_and_run(compiler, filepath):
+    Compoment.unmatch = {}
     with open(filepath, 'r', encoding='utf-8') as f:
         source = f.read()
 
-    # 预处理
     preprocesser = Preprocesser()
     preprocessed = preprocesser.process(source)
 
-    # 编译（静默）
-    buf = io.StringIO()
-    sys.stdout = buf
+    _silence()
     try:
         state, code = compiler.Complie_file(preprocessed)
-    finally:
-        sys.stdout = old_stdout
+    except Exception as e:
+        _restore()
+        return False, "", f"编译异常: {e}"
+    _restore()
 
     if not state:
         return False, "", "编译失败"
 
-    # 后处理
     postprocesser = Postprocesser()
     code = postprocesser.process(code)
 
-    # 运行虚拟机
     runner = Runner()
     lines = [ln for ln in code.strip().split("\n") if ln.strip()]
 
@@ -109,88 +120,15 @@ def compile_and_run_file(filepath):
     sys.stdout = output_buf
     try:
         runner.RUN(lines)
-    finally:
-        sys.stdout = old_stdout
-
-    output = output_buf.getvalue()
-    # 去掉虚拟机执行时间输出
-    # runner的输出格式：先print所有指令，再print执行结果，最后print执行时间
-    # 我们只要OUT指令产生的字符输出
-    # 问题：runner.RUN会先print每条指令... 我们需要更精确地捕获
-
-    return True, output, ""
-
-
-def compile_and_run_file_clean(filepath):
-    """
-    更干净地编译并运行：只捕获OUT产生的输出。
-    通过 monkey-patch runner 的 print 来只抓 OUT 输出不太优雅，
-    所以我们直接 patch sys.stdout 并过滤掉非OUT输出。
-    
-    实际上 runner.RUN 在执行时会 print 每行指令 + "**execing**" + 执行时间,
-    而 OUT 指令输出的是 print(chr(...), end="", flush=True)
-    
-    更好的方案：直接运行，然后从输出中提取 "**execing**" 之后、"虚拟机执行时间" 之前的内容。
-    """
-    from src.Construct_tree import Compiler, Compoment
-    from src.postprocesser import Postprocesser
-    from src.preprocesser import Preprocesser
-    from src.runner import Runner
-
-    # 重置
-    Compoment.Cs = {}
-    Compoment.unmatch = {}
-
-    compiler = Compiler()
-    config_path = os.path.join(ROOT, "src", "Config.txt")
-
-    # 加载语法配置（静默）
-    with contextlib.redirect_stdout(io.StringIO()):
-        compiler.construct_componets(config_path)
-
-    # 读取源文件
-    with open(filepath, 'r', encoding='utf-8') as f:
-        source = f.read()
-
-    # 预处理
-    preprocesser = Preprocesser()
-    preprocessed = preprocesser.process(source)
-
-    # 编译（静默）
-    with contextlib.redirect_stdout(io.StringIO()):
-        state, code = compiler.Complie_file(preprocessed)
-
-    if not state:
-        return False, "", "编译失败"
-
-    # 后处理
-    postprocesser = Postprocesser()
-    code = postprocesser.process(code)
-
-    # 运行虚拟机 - 捕获所有输出
-    runner = Runner()
-    lines = [ln for ln in code.strip().split("\n") if ln.strip()]
-
-    output_buf = io.StringIO()
-    with contextlib.redirect_stdout(output_buf):
-        try:
-            runner.RUN(lines)
-        except Exception as e:
-            return False, "", f"运行时错误: {e}\n{traceback.format_exc()}"
+    except Exception as e:
+        _restore()
+        return False, "", f"运行时错误: {e}"
+    _restore()
 
     raw_output = output_buf.getvalue()
-
-    # 从 raw_output 中提取 OUT 产生的输出
-    # runner 输出格式：
-    #   每条指令一行 (print(line))
-    #   "**********execing*********"
-    #   OUT的字符（无换行，除非代码输出\n）
-    #   "\n虚拟机执行时间: ... 秒"
-    
     marker = "**********execing*********\n"
     if marker in raw_output:
         after_marker = raw_output.split(marker, 1)[1]
-        # 去掉末尾的 "\n虚拟机执行时间: ... 秒\n"
         time_marker = "\n虚拟机执行时间:"
         if time_marker in after_marker:
             user_output = after_marker.split(time_marker, 1)[0]
@@ -202,9 +140,9 @@ def compile_and_run_file_clean(filepath):
     return True, user_output, ""
 
 
-# ============ 主测试流程 ============
 def main():
     cases_dir = os.path.join(ROOT, "tests", "cases")
+    compiler = init_compiler()
     
     passed = 0
     failed = 0
@@ -213,16 +151,14 @@ def main():
 
     print("=" * 60)
     print("  端到端 .y 源代码测试")
-    print("  编译流程: 源码 → 预处理 → 语法分析 → 代码生成 → 后处理 → 运行")
     print("=" * 60)
-    print()
 
     for filename, expected, skip in TEST_CASES:
         filepath = os.path.join(cases_dir, filename)
 
         if skip:
             skipped += 1
-            print(f"  ⏭️  {filename}: SKIP (已知限制)")
+            print(f"  ⏭️  {filename}: SKIP")
             continue
         
         if not os.path.exists(filepath):
@@ -233,7 +169,20 @@ def main():
             continue
 
         try:
-            success, output, err_msg = compile_and_run_file_clean(filepath)
+            def _timeout_handler(signum, frame):
+                raise TimeoutError("执行超时")
+            signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(TIMEOUT_SEC)
+            success, output, err_msg = compile_and_run(compiler, filepath)
+            signal.alarm(0)
+        except TimeoutError:
+            signal.alarm(0)
+            failed += 1
+            msg = f"  ❌ {filename}: 执行超时(可能死循环)"
+            print(msg)
+            errors.append(msg)
+            _restore()
+            continue
         except Exception as e:
             failed += 1
             msg = f"  ❌ {filename}: 异常 - {e}"
@@ -248,7 +197,6 @@ def main():
             errors.append(msg)
             continue
 
-        # 验证输出
         if output == expected:
             passed += 1
             print(f"  ✅ {filename}: '{output}' == '{expected}'")
@@ -258,7 +206,6 @@ def main():
             print(msg)
             errors.append(msg)
 
-    # 总结
     print()
     print("=" * 60)
     total = passed + failed + skipped
@@ -273,10 +220,8 @@ def main():
     print()
     if failed == 0:
         print("  🎉 ALL E2E TESTS PASSED!")
-        if skipped > 0:
-            print(f"  (其中 {skipped} 项为已知限制，待后续完善)")
     
-    print()
+    _devnull.close()
     sys.exit(0 if failed == 0 else 1)
 
 
