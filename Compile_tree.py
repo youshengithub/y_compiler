@@ -113,7 +113,7 @@ def Complie(name,rule,oplist,codelist,area_tree):
         pass
     elif(name=="AREA"):
         for i in codelist:code+=i
-        if(rule=="$AREA_S$$AREA_E$"): code+="NOPs\n"
+        if(rule=="$AREA_S$$AREA_E$"): code+="NOP\n"
     elif(name=="REGS"):
         pass
     elif(name=="DIM"): #这里要产生巨变！
@@ -143,13 +143,13 @@ def Complie(name,rule,oplist,codelist,area_tree):
             if(length<len(string)):
                 length=len(string)
             code="ALLOC "+str(length)+"//"+type+"\n"  
-            base=str(area_tree.clac_current_pos()) 
+            base=area_tree.clac_current_pos()
             t=y_token()
             t.set_as_variable(var[0],find_type.size*num,type,base,[int(i) for i in var[1:]])
             area_tree.append_var(t)
             for i in range(len(string)):
-                code+="MOV "+base+":"+str(i)+" "+str(ord(string[i]))+ "\n"
-            code+="MOV "+base+":"+str(len(string))+ " 0\n"
+                code+="MOV "+str(base)+":"+str(i)+" "+str(ord(string[i]))+ "\n"
+            code+="MOV "+str(base)+":"+str(len(string))+ " 0\n"
         else:
             print(oplist)
     elif(name=="OP"):
@@ -345,10 +345,16 @@ def Complie(name,rule,oplist,codelist,area_tree):
             for i in codelist: code+=i 
     elif(name=="IF"):
         code=codelist[0]
-        code+="JPIF "+str((codelist[1]).count("\n")+2)+"\n"
-        code+=codelist[1]
-        code+="JMP "+str((codelist[2]).count("\n")+1)+"\n"
-        code+=codelist[2]
+        if(len(codelist)>=3):
+            # if-else: JUDGE + BODY + ELSE_BODY
+            code+="JPIF "+str((codelist[1]).count("\n")+2)+"\n"
+            code+=codelist[1]
+            code+="JMP "+str((codelist[2]).count("\n")+1)+"\n"
+            code+=codelist[2]
+        else:
+            # 纯 if（无 else）: JUDGE + BODY
+            code+="JPIF "+str((codelist[1]).count("\n")+1)+"\n"
+            code+=codelist[1]
         pass
     elif(name=="DO"):
         code=codelist[0]+codelist[1]

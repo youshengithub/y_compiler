@@ -24,8 +24,26 @@
 #PUSH
 #POP
 #IN
-import time, msvcrt
+import time
+import sys
 import cProfile
+
+# 跨平台 getch 实现
+try:
+    import msvcrt
+    def _getch():
+        return msvcrt.getch()
+except ImportError:
+    import tty, termios
+    def _getch():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch.encode('utf-8')
 # 记录开始时间
 
 class Runner:
@@ -262,7 +280,7 @@ class Runner:
                     pass
                     print(chr(int(op1)),end="",flush=True)
             elif(keywords[0]=="IN"):
-                char = msvcrt.getch()
+                char = _getch()
                 assert(flag1=="pos")
                 if(flag1=="pos"):
                     self.memory[op1]=ord(char)
