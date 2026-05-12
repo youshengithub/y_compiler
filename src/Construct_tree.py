@@ -197,12 +197,18 @@ class Compiler:
             for line in file:
                 line=line.replace(' ', '')
                 if(line==""):continue
-                temp=line.split(":")
-                name=temp[0]
-                configs=temp[1].split("#")
+                # 格式: NAME:configs:attribute
+                # 用rsplit从右侧分割，确保configs中可以包含冒号
+                parts = line.rsplit(":", 1)  # 从右分割一次，得到 [name:configs, attribute]
+                attribute = parts[1] if len(parts) > 1 else ""
+                name_configs = parts[0]
+                # 再分割第一个冒号得到 name 和 configs
+                nc_parts = name_configs.split(":", 1)
+                name = nc_parts[0]
+                configs_str = nc_parts[1] if len(nc_parts) > 1 else ""
+                configs=configs_str.split("#")
                 if(configs[-1]==""):
                     configs=configs[0:-1]
-                attribute=temp[2]
                 revised_configs=[]
                 for config in configs:
                     revised_configs+=self.revise_config(config)

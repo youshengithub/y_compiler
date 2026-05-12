@@ -28,7 +28,7 @@ INCR:$VAR$++:NO_START#
 DECR:$VAR$--:NO_START#
 BREAK:break:NO_START#
 CONTINUE:continue:NO_START#
-SENTENCE:$CALL$; # $INCR$; # $DECR$; # $BREAK$; # $CONTINUE$; # $JUDGE$;# $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$; # $OUTNUM$; # $FUNC$<;|> # $DIM$; # $STRUCTURE$ # $RETURN$; # $ASM$; :REPEAT# 
+SENTENCE:$CALL$; # $INCR$; # $DECR$; # $BREAK$; # $CONTINUE$; # $JUDGE$;# $SWITCH$ # $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$; # $OUTNUM$; # $FUNC$<;|> # $DIM$; # $STRUCTURE$ # $RETURN$; # $ASM$; :REPEAT# 
 AREA_S:{:NO_START
 AREA_E:}:NO_START
 AREA:$AREA_S$$SENTENCE$$AREA_E$ # $AREA_S$$AREA_E$:# 
@@ -37,6 +37,8 @@ IF:if($JUDGE$)$AREA$<else$AREA$|># :
 DO:do$AREA$while($JUDGE$)# :
 WHILE:while($JUDGE$)$AREA$# :
 FOR:for($EQUAL$;$JUDGE$;$EQUAL$)$AREA$ # for($EQUAL$;$JUDGE$;$INCR$)$AREA$ # for($EQUAL$;$JUDGE$;$DECR$)$AREA$ :
+SWITCH:switch($OPN$){$CASELIST$}:
+CASELIST:case$EMPTY$$CONST$:$SENTENCE$$CASELIST$ # case$EMPTY$$CONST$:$SENTENCE$ # default:$SENTENCE$:NO_START#
 PRINT:out($<OP|OPN>$)# :
 OUTNUM:outnum($<OP|OPN>$)# :
 CALL:$TOKEN$.$CALL$ # $TOKEN$(<$ARG$|>):

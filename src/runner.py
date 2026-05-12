@@ -50,6 +50,35 @@ class Runner:
     def __init__(self) -> None:
         pass
     def calc_pos(self,text,REGS): #通过此来计算和数据
+        if text.startswith("@"):
+            # 间接寻址：通过 this 指针访问结构体成员
+            inner = text[1:]
+            parts = inner.split(":")
+            base = int(parts[0])  # this_pos
+            # this_addr = memory[EBP + this_pos]
+            this_addr = int(self.memory[int(self.memory[REGS["EBP"]]) + base])
+            if len(parts) == 2:
+                # @this_pos:offset → memory[this_addr + offset]
+                offset = int(parts[1])
+                return "pos", this_addr + offset
+            elif len(parts) == 3:
+                # @this_pos:base_offset:@idx_offset 或 @this_pos:base_offset:$idx_pos
+                base_offset = int(parts[1])
+                idx_part = parts[2]
+                if idx_part.startswith("@"):
+                    # idx 也是结构体成员：memory[this_addr + idx_offset]
+                    idx_offset = int(idx_part[1:])
+                    idx_val = int(self.memory[this_addr + idx_offset])
+                elif idx_part.startswith("$"):
+                    # idx 是局部变量：memory[EBP + idx_pos]
+                    idx_pos = int(idx_part[1:])
+                    idx_val = int(self.memory[int(self.memory[REGS["EBP"]]) + idx_pos])
+                else:
+                    idx_val = int(idx_part)
+                return "pos", this_addr + base_offset + idx_val
+            else:
+                # 单段 @pos（不太可能但防御性处理）
+                return "pos", this_addr
         if("$"  in text):
             ans=0
             texts=text.split(":")

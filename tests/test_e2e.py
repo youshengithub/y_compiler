@@ -105,6 +105,26 @@ TEST_CASES = [
     ("t78_array_reverse.y",     "CBA",  False),
     ("t79_bubble_sort.y",       "123",  False),
     ("t80_max_min.y",           "9",    False),
+    # — 新增功能：switch/case、成员函数、继承 —
+    ("t81_switch_case.y",       "B",    False),
+    ("t82_switch_default.y",    "D",    False),
+    ("t83_method.y",            "B",    False),
+    ("t84_method_return.y",     "A",    False),
+    ("t85_constructor.y",       "AB",   False),
+    ("t86_inheritance.y",       "4",    False),
+    ("t88_strlen.y",            "5",    False),
+    ("t89_switch_no_default.y", "A",    False),
+    ("t90_method_multi.y",      "D",    False),
+    ("t91_multi_instance.y",    "AB",   False),
+    ("t92_switch_fallthrough.y","AC",   False),
+    ("t93_method_modify.y",     "A",    False),
+    ("t94_nested_struct_access.y","A",  False),
+    ("t95_struct_access.y",     "AB",   False),
+    ("t96_linked_list.y",       "3",    False),
+    ("t97_method_chain.y",      "C",    False),
+    ("t98_switch_assign.y",     "B",    False),
+    ("t99_method_loop.y",       "5",    False),
+    ("t100_stack.y",            "CBA",  False),
 ]
 
 _devnull = open(os.devnull, 'w')

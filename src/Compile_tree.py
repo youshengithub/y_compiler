@@ -4,6 +4,25 @@ from src.token_ana import *
 # ============ 循环上下文栈（用于 break/continue）============
 _loop_stack = []  # 每个元素 = {"break_placeholders": [], "continue_placeholders": []}
 
+# ============ 方法上下文栈（用于成员函数中的 this 指针）============
+_method_stack = []  # 每个元素 = {"struct_vars": list, "this_pos": int}
+
+def _push_method(struct_vars, this_pos):
+    """进入结构体方法时压栈"""
+    _method_stack.append({"struct_vars": struct_vars, "this_pos": this_pos})
+
+def _pop_method():
+    """离开结构体方法时弹栈"""
+    return _method_stack.pop()
+
+def _in_method():
+    """是否在结构体方法内"""
+    return len(_method_stack) > 0
+
+def _current_method_info():
+    """获取当前方法的结构体信息"""
+    return _method_stack[-1] if _method_stack else None
+
 def _push_loop():
     _loop_stack.append({"break_placeholders": [], "continue_placeholders": []})
 
@@ -47,6 +66,37 @@ def _addr(area_tree, op):
         idx_str = s[bracket_pos+1:-1]  # 去掉 [ 和 ]
         tk = area_tree.find_token(var_name)
         if tk is not None and hasattr(tk, "start_pos"):
+            # 检查是否在方法内且变量是结构体成员
+            if _in_method():
+                method_info = _current_method_info()
+                struct_vars = method_info["struct_vars"]
+                is_member = False
+                for member in struct_vars:
+                    if member is tk:
+                        is_member = True
+                        break
+                if is_member:
+                    this_pos = method_info["this_pos"]
+                    # 数组成员通过 this 间接访问
+                    if idx_str.isdigit():
+                        return "@" + str(this_pos) + ":" + str(tk.start_pos + int(idx_str))
+                    elif idx_str[0] == '-' and idx_str[1:].isdigit():
+                        return "@" + str(this_pos) + ":" + str(tk.start_pos + int(idx_str))
+                    else:
+                        # 变量下标也可能是结构体成员
+                        idx_tk = area_tree.find_token(idx_str)
+                        if idx_tk is not None and hasattr(idx_tk, "start_pos"):
+                            idx_is_member = False
+                            for m in struct_vars:
+                                if m is idx_tk:
+                                    idx_is_member = True
+                                    break
+                            if idx_is_member:
+                                return "@" + str(this_pos) + ":" + str(tk.start_pos) + ":@" + str(idx_tk.start_pos)
+                            else:
+                                return "@" + str(this_pos) + ":" + str(tk.start_pos) + ":$" + str(idx_tk.start_pos)
+                    return s
+
             # 检测是否是全局变量
             prefix = "$"
             current_top = area_tree.find_top_father()
@@ -117,10 +167,17 @@ def _addr(area_tree, op):
     except Exception:
         tk = None
     if tk is not None and hasattr(tk, "start_pos"):
+        # 检查是否是结构体定义中的成员（在方法内通过 this 间接访问）
+        if _in_method():
+            method_info = _current_method_info()
+            struct_vars = method_info["struct_vars"]
+            for member in struct_vars:
+                if member is tk:
+                    # 这是结构体成员，需要通过 this 指针间接访问
+                    this_pos = method_info["this_pos"]
+                    return "@" + str(this_pos) + ":" + str(tk.start_pos)
         # 判断变量是否在当前顶级域中
-        # 当前顶级域
         current_top = area_tree.find_top_father()
-        # 查找变量所在的顶级域（沿父链查找包含该变量的area）
         search = area_tree
         var_top = None
         while search is not None:
@@ -679,11 +736,52 @@ def Complie(name, rule, oplist, codelist, area_tree):
     elif name == "FUNCNAME":
         sub_area = area_tree.new_area(True, oplist[0])
         area_tree = sub_area
+        # 检查是否在结构体定义内
+        # 结构体AREA子域中定义的FUNC，其parent是结构体的AREA子域
+        parent = sub_area.father
+        if parent is not None:
+            is_in_struct = False
+            struct_name_found = ""
+            if parent.name != "Main" and parent.name != " ":
+                for v in parent.vars:
+                    if v.kind == token_type.variable:
+                        is_in_struct = True
+                        struct_name_found = parent.name
+                        break
+            if is_in_struct:
+                # 在结构体方法内，注入隐式 _this 参数
+                this_pos = sub_area.clac_current_pos()
+                this_token = y_token()
+                this_token.set_as_variable("_this", 1, "int", this_pos, [])
+                sub_area.append_var(this_token, 1)
+                # 收集结构体成员变量（排除函数）
+                struct_member_vars = [v for v in parent.vars if v.kind == token_type.variable]
+                _push_method(struct_member_vars, this_pos)
         pass
 
     elif name == "FUNC":
+        # 检查当前函数是否在结构体内定义（方法）
+        # 通过检查 area_tree.father 是否有结构体的特征来判断
+        is_method = False
+        struct_name = ""
+        parent_area = area_tree.father
+        if parent_area is not None:
+            # 检查父域中是否有结构体类型（即我们在结构体定义的 AREA 中）
+            # 结构体的 AREA 不是 top_area
+            if not parent_area.is_top_area or (parent_area.father is not None and hasattr(parent_area, 'name')):
+                # 更可靠的检测：检查 area_tree 的 name 是否被注册为某个结构体的方法
+                # 简化方案：如果 STRUCTURE 规则正在处理，那么 FUNC 在其子域中
+                # 我们通过检查 grandparent 是否正在构建结构体来判断
+                # 实际上用 area_tree.father 的 vars 里是否有结构体定义来判断
+                pass
+
         for i in codelist:
             code += i
+
+        # 如果是方法，弹出方法上下文
+        if _in_method():
+            _pop_method()
+
         revise_code = code.split("\n")[:-1]
         code = ""
         for i in range(len(revise_code)):
@@ -714,20 +812,33 @@ def Complie(name, rule, oplist, codelist, area_tree):
         # 检测方法调用 obj.method()
         if rule == "$TOKEN$.$CALL$":
             # 成员方法调用 — obj.method(args)
-            # oplist[0] 是对象名（外层TOKEN），内层CALL递归处理
-            # 这里需要把对象基地址作为隐式参数传入
+            # oplist[0] 是对象名（外层TOKEN）
+            # codelist 中包含内层 CALL 已经完整生成的调用代码
             obj_name = oplist[0]
             obj_tk = area_tree.find_token(obj_name)
             if obj_tk is not None:
-                # 获取对象的结构体类型
                 struct_tk = area_tree.find_token(obj_tk.type)
                 if struct_tk is not None and struct_tk.kind == token_type.structure:
-                    # 在 codelist[0] 中已经有了内层 CALL 的代码
-                    # 我们需要先压入对象基地址作为隐式第一个参数
-                    # 但当前架构下内层CALL已经生成了完整代码
-                    # 简单处理：直接使用内层CALL代码
+                    # 内层 CALL 已经生成了完整的函数调用代码
+                    # 我们需要在保存区建立之后、参数压栈之前，插入隐式 this (对象基地址)
+                    inner_code = ""
                     for i in codelist:
-                        code += i
+                        inner_code += i
+                    # 找到 "MOV ETP ESP\n" 的位置，在其后插入 PUSH 对象地址
+                    marker = "MOV ETP ESP\n"
+                    if marker in inner_code:
+                        idx = inner_code.index(marker) + len(marker)
+                        obj_addr = _addr(area_tree, obj_name)
+                        # 如果对象是相对地址($N)，我们需要传递实际地址 = EBP + N
+                        if obj_addr.startswith("$"):
+                            this_push = "MOV EAX EBP\nADD EAX " + obj_addr[1:] + "\nPUSH EAX\n"
+                        elif obj_addr.startswith("%"):
+                            this_push = "PUSH " + obj_addr[1:] + "\n"
+                        else:
+                            this_push = "PUSH " + obj_addr + "\n"
+                        code = inner_code[:idx] + this_push + inner_code[idx:]
+                    else:
+                        code = inner_code
                 else:
                     for i in codelist:
                         code += i
@@ -823,6 +934,59 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code += i
         pass
 
+    elif name == "SWITCH":
+        # switch(expr) { case ... }
+        # oplist[0] = 被比较的变量
+        # codelist: [OPN_code(空), CASELIST_code]，CASELIST在最后
+        switch_var = _addr(area_tree, oplist[0])
+        case_code = codelist[-1] if codelist else ""
+        # 替换占位符为实际变量地址
+        case_code = case_code.replace("SWITCH_VAR", switch_var)
+        code = case_code
+
+    elif name == "CASELIST":
+        if "case" in rule and "$CASELIST$" in rule:
+            # case EMPTY CONST : SENTENCE CASELIST → 链式递归
+            # codelist: [EMPTY_code, CONST_code, SENTENCE_code, CASELIST_code]
+            # 由于保留空占位符，SENTENCE和CASELIST分别在最后两个位置
+            case_val = oplist[0]
+            # 找到有效的 SENTENCE 和 CASELIST 代码
+            # SENTENCE 是倒数第二个，CASELIST 是倒数第一个
+            body_code = codelist[-2] if len(codelist) >= 2 else ""
+            rest_code = codelist[-1] if len(codelist) >= 1 else ""
+            body_lines = len([l for l in body_code.split("\n") if l.strip()])
+            rest_lines = len([l for l in rest_code.split("\n") if l.strip()])
+            has_break = "JMP BREAK_PLACEHOLDER" in body_code
+            if has_break:
+                body_code_clean = body_code.replace("JMP BREAK_PLACEHOLDER\n", "")
+                body_lines_clean = len([l for l in body_code_clean.split("\n") if l.strip()])
+                code = "EQUAL SWITCH_VAR " + case_val + "\n"
+                code += "JPIF " + str(body_lines_clean + 2) + "\n"
+                code += body_code_clean
+                code += "JMP " + str(rest_lines + 1) + "\n"
+                code += rest_code
+            else:
+                code = "EQUAL SWITCH_VAR " + case_val + "\n"
+                code += "JPIF " + str(body_lines + 1) + "\n"
+                code += body_code
+                code += rest_code
+        elif "case" in rule and "$CASELIST$" not in rule:
+            # case EMPTY CONST : SENTENCE → 最后一个 case
+            case_val = oplist[0]
+            body_code = codelist[-1] if codelist else ""
+            body_code = body_code.replace("JMP BREAK_PLACEHOLDER\n", "")
+            body_lines = len([l for l in body_code.split("\n") if l.strip()])
+            code = "EQUAL SWITCH_VAR " + case_val + "\n"
+            code += "JPIF " + str(body_lines + 1) + "\n"
+            code += body_code
+        elif "default" in rule:
+            body_code = codelist[-1] if codelist else ""
+            body_code = body_code.replace("JMP BREAK_PLACEHOLDER\n", "")
+            code = body_code
+        else:
+            for i in codelist:
+                code += i
+
     elif name == "RETURN":
         if "$OP$" in rule:
             real_codes = [c_item for c_item in codelist if c_item.strip() and c_item.strip() != "NOP"]
@@ -844,6 +1008,11 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "STRUCTURE":
+        # 收集方法的 IR 代码（在 codelist 中）
+        for i in codelist:
+            if i.strip() and i.strip() != "NOP":
+                code += i
+
         t = y_token()
         func = []
         vars_list = []
