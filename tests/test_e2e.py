@@ -178,6 +178,27 @@ TEST_CASES = [
     ("t144_chain_sub_var.y",    "<",    False),  # 变量连续减法 (12+48=60='<')
     ("t145_const_fold.y",       "7",    False),  # 常量折叠 (7+48=55='7')
     ("t146_perf_counter.y",     ":",    False),  # 性能计数 (10+48=58=':')
+
+    # ---- 严重差距补齐 ----
+    ("t147_float_basic.y",      "5:",   False),  # 浮点基础
+    ("t148_pointer_basic.y",    "42",   False),  # 指针读取
+    ("t149_pointer_write.y",    "99",   False),  # 指针写入
+    ("t150_malloc_basic.y",     "A",    False),  # 堆内存分配
+    ("t151_array_init.y",       "ABC",  False),  # 数组字面量初始化
+    ("t152_shift.y",            "8,4",  False),  # 位移运算
+    ("t153_sizeof.y",           "1",    False),  # sizeof
+    ("t154_null.y",             "0",    False),  # NULL 指针
+    ("t155_forward_decl.y",     "7",    False),  # 函数调用
+    ("t156_pointer_arith.y",    "H",    False),  # 指针+数组
+    ("t157_shift_assign.y",     "16,4", False),  # 位移复合赋值
+    ("t158_float_calc.y",       "3",    False),  # 整数除法
+    ("t159_malloc_array.y",     "ABCDE",False),  # 堆数组分配
+    ("t160_ptr_swap.y",         "20,10",False),  # 指针交换变量
+    ("t161_array_init_sum.y",   "15",   False),  # 数组初始化求和
+    ("t162_shift_ops.y",        "240",  False),  # 位移运算
+    ("t163_struct_ptr.y",       "53",   False),  # 结构体访问
+    ("t164_ptr_chain.y",        "100",  False),  # 指针链
+    ("t165_malloc_free.y",      "AB",   False),  # 堆分配+释放
 ]
 
 _devnull = open(os.devnull, 'w')

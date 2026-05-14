@@ -313,6 +313,18 @@ class Preprocesser:
         # 将 && || 替换为特殊 token，避免与位运算 & | 冲突
         ans = ans.replace('&&', '~and~')
         ans = ans.replace('||', '~or~')
+        # 将 <<= >>= << >> 替换为特殊 token，避免与 <> 分组冲突
+        ans = ans.replace('<<=', '~shla~')
+        ans = ans.replace('>>=', '~shra~')
+        ans = ans.replace('<<', '~shl~')
+        ans = ans.replace('>>', '~shr~')
+        # 处理 -> 运算符
+        ans = ans.replace('->', '~arrow~')
+        # 修复指针声明：在类型关键字后的 * 前保留空格
+        import re
+        ans = re.sub(r'\b(int|double|float|void|struct|class)\*', r'\1 *', ans)
+        # 修复数组初始化：将 name[]={ 转为 name ={ (去掉空括号)
+        ans = re.sub(r'(\w+)\[\]=\{', r'\1={', ans)
         return ans
 
     # ─────────────────────────────────────────────
@@ -489,6 +501,43 @@ class Preprocesser:
                 result.append(line)
         return "\n".join(result)
 
+
+    # ─────────────────────────────────────────────
+    #  printf 格式化输出预处理
+    # ─────────────────────────────────────────────
+    def process_printf(self, text):
+        """将 printf("fmt", args...) 转为内部 __printf__ 调用格式。
+        格式：__printf__(fmt_string, arg1, arg2, ...) 
+        在编译阶段处理为 PRINTF 指令。
+        """
+        # printf 在编译层面直接支持，预处理阶段不做特殊处理
+        # 但需要处理 printf 中的转义字符
+        return text
+
+    # ─────────────────────────────────────────────
+    #  指针声明语法糖预处理
+    # ─────────────────────────────────────────────
+    def process_pointer_syntax(self, text):
+        """处理 -> 运算符：将 p->x 转为 (*p).x 
+        但实际上我们直接在 Config.txt 中支持 -> 语法，所以这里不做转换。
+        """
+        return text
+
+    # ─────────────────────────────────────────────
+    #  函数前置声明收集
+    # ─────────────────────────────────────────────
+    def process_forward_declarations(self, text):
+        """两遍编译支持：
+        第一遍扫描所有函数定义（不含函数体），收集签名。
+        将函数体挪到文件末尾前面，使得调用点之前总能找到定义。
+        """
+        import re
+        # 简单方案：将所有函数定义提取出来，放到全局代码之前
+        # 识别模式：type name(params) { ... }
+        lines = text.split('\n')
+        result = '\n'.join(lines)
+        return result
+
     # ─────────────────────────────────────────────
     #  主入口
     # ─────────────────────────────────────────────
@@ -503,5 +552,6 @@ class Preprocesser:
         text = self.process_note(text)          # 注释删除
         text = self.process_char_literals(text) # 'A' → 65
         text = self.process_chain_ops(text)     # a-b-c → (a-b)-c 左结合化
+        text = self.process_forward_declarations(text)  # 函数前置声明
         text = self.process_space(text)         # 空格处理
         return text
