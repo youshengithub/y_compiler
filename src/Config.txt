@@ -1,0 +1,59 @@
+KEYWORDS: @^<struct|class|void|in|if|do|while|for|out|outnum|else|func|return|struct|int|double|continue|break|switch|case|default|asm>@ : NO_START
+TYPE:@^double@ # @^int@ # @^void@ # $TOKEN$:NO_START# 
+STRUCTURE:<struct|class>$EMPTY$$FUNCNAME$$AREA$;: # 
+TOKEN:@(^[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*@: NO_START# # IS_KEYWORDS 
+REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# IS_KEYWORDS 
+VAR: $REGS$  # @((^(?!struct$)(?!class)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!outnum$)(?!else$)(?!func)(?!return)(?!struct$)(?!int$)(?!asm$)(?!double$)(?!break$)(?!continue$)(?!switch$)(?!case$)(?!default$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!asm$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ :NO_START# 
+CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
+STRING:@^"([^"]|(\\"))*"@:NO_START# 
+OPN:$CALL$ # $ARRIDX$ # $VAR$ # $CONST$ # ($OP$) # $TERNARY$ :NO_START# 
+OP: $ADD$ # $SUB$ # $CALL$ # $AND$ # $OR$ # $XOR$ # $FACTOR$ :NO_START# 
+FACTOR: $MUL$ # $DIV$ # $MOD$ # $UNARY$ :NO_START#
+UNARY: $NOT$ # $GETP$ # $IN$ # $OPN$ :NO_START#
+ADD:$<OP|FACTOR>$+$<OP|FACTOR>$:NO_START# 
+SUB:$<OP|FACTOR>$-$<FACTOR>$:NO_START# 
+MUL:$<FACTOR|UNARY>$*$<FACTOR|UNARY>$:NO_START# 
+DIV:$<FACTOR|UNARY>$/$<FACTOR|UNARY>$:NO_START# 
+AND:$<OP|OPN>$&$<OP|OPN>$:NO_START# 
+OR: $<OP|OPN>$|$<OP|OPN>$:NO_START# 
+NOT:          !$<OP|OPN>$:NO_START# 
+XOR:$<OP|OPN>$^$<OP|OPN>$:NO_START# 
+MOD:$<FACTOR|UNARY>$%$<FACTOR|UNARY>$:NO_START# 
+GETP:&$VAR$:NO_START# 
+SETP:*$<OP|OPN>$:NO_START# 
+IN:in():NO_START# 
+DIM:$TYPE$$EMPTY$$TOKEN$=$OP$ # $TYPE$$EMPTY$$TOKEN$=$OPN$ # $TYPE$$EMPTY$$TOKEN$=$STRING$ # $TYPE$$EMPTY$$TOKEN$:REPEAT# NO_START# 
+EQUAL:$VAR$+=$<OP|OPN>$ # $VAR$-=$<OP|OPN>$ # $VAR$*=$<OP|OPN>$ # $VAR$/=$<OP|OPN>$ # $VAR$%=$<OP|OPN>$ # <$ARRIDX$|$VAR$|$SETP$>=<$OP$|$OPN$># :NO_START# 
+INCR:$VAR$++:NO_START#
+DECR:$VAR$--:NO_START#
+BREAK:break:NO_START#
+CONTINUE:continue:NO_START#
+SENTENCE:$CALL$; # $INCR$; # $DECR$; # $BREAK$; # $CONTINUE$; # $JUDGE$;# $SWITCH$ # $FOR$<;|># $DO$<;|># $WHILE$<;|># $IF$#<;|> $EQUAL$;# $PRINT$; # $OUTNUM$; # $FUNC$<;|> # $DIM$; # $STRUCTURE$ # $RETURN$; # $ASM$; :REPEAT# 
+AREA_S:{:NO_START
+AREA_E:}:NO_START
+AREA:$AREA_S$$SENTENCE$$AREA_E$ # $AREA_S$$AREA_E$:# 
+JUDGE:$OP$==$OP$# $OP$>=$OP$# $OP$<=$OP$# $OP$>$OP$# $OP$<$OP$# $OP$!=$OP$# !$<OP|OPN>$# ($COND$)# :
+COND:$JUDGE$~and~$COND$# $JUDGE$~or~$COND$# $JUDGE$ :NO_START# 
+IF:if($COND$)$AREA$$ELIF$# if($COND$)$AREA$<else$AREA$|># :
+ELIF:elif($COND$)$AREA$$ELIF$# elif($COND$)$AREA$else$AREA$# elif($COND$)$AREA$# :NO_START# 
+DO:do$AREA$while($COND$)# :
+WHILE:while($COND$)$AREA$# :
+FOR:for($EQUAL$;$COND$;$EQUAL$)$AREA$ # for($EQUAL$;$COND$;$INCR$)$AREA$ # for($EQUAL$;$COND$;$DECR$)$AREA$ # for($DIM$;$COND$;$EQUAL$)$AREA$ # for($DIM$;$COND$;$INCR$)$AREA$ # for($DIM$;$COND$;$DECR$)$AREA$ :
+SWITCH:switch($OPN$){$CASELIST$}:
+CASELIST:case$EMPTY$$CONST$:$SENTENCE$$CASELIST$ # case$EMPTY$$CONST$:$SENTENCE$ # default:$SENTENCE$:NO_START#
+PRINT:out($<OP|OPN>$)# :
+OUTNUM:outnum($<OP|OPN>$)# :
+CALL:$TOKEN$.$CALL$ # $TOKEN$(<$ARG$|>):
+ARG:$tARG$ # :NO_START# REPEAT# 
+tARG:$OP$,$tARG$ #  $OPN$,$tARG$  # $OP$ # $OPN$  :NO_START#
+tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
+PAR:$tPAR$:
+FUNCNAME:$TOKEN$:NO_START# 
+FUNC:$TYPE$$EMPTY$$FUNCNAME$(<$PAR$|>)$AREA$:
+RETURN:return$EMPTY$<$OP$|$OPN$> # return:NO_START#
+OPS:@^+@ # @^-@ # @^*@ # @^/@ # @^&@ # @^|@ # @^!@ # @^^@ # @^%@ :NO_START# 
+OPERATOR:$TYPE$--$OPS$--$FUNCNAME$(<$PAR$|>)$AREA$:
+ASM:asm($STRING$): NO_START
+ARRIDX:$VAR$[$OP$]:NO_START# 
+TERNARY:($COND$)?$<OP|OPN>$:$<OP|OPN>$:NO_START#
+EMPTY:@^\s+@:NO_START
