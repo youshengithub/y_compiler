@@ -142,6 +142,42 @@ TEST_CASES = [
     ("t113_dim_expr_init.y",    "A",    False),
     ("t114_complex_judge.y",    "2",    False),
     ("t115_fib_nested_call.y",  "3",    False),
+
+    # ---- 数组作为函数参数 ----
+    ("t116_arr_param_read.y",   "D",    False),  # 数组参数读取
+    ("t117_arr_param_write.y",  "B",    False),  # 数组参数写入
+    ("t118_arr_param_pass.y",   "A",    False),  # 数组参数再传递
+    ("t119_arr_param_sort.y",   "1",    False),  # 数组参数排序
+    ("t120_global_arr_param.y", "C",    False),  # 全局数组参数
+
+    # ---- 预处理器增强: 宏/条件编译/标准库 ----
+    ("t121_func_macro.y",       "A",    False),  # 函数式宏
+    ("t122_ifdef.y",            "AB",   False),  # #ifdef / #ifndef
+    ("t123_undef.y",            "AB",   False),  # #undef
+    ("t124_include_stdio.y",    "65",   False),  # stdio.y print_int
+    ("t125_include_math.y",     "A",    False),  # math.y abs
+    ("t126_max_min.y",          "AB",   False),  # math.y max/min
+    ("t127_gcd_lib.y",          "4",    False),  # math.y gcd
+    ("t128_include_stdlib.y",   "F",    False),  # stdlib.y 全包含
+    ("t129_multiline_macro.y",  "Hi",   False),  # 多行宏
+    ("t130_ifdef_else.y",       "A",    False),  # #ifdef #else
+    ("t131_include_guard.y",    "A",    False),  # include 防重复
+    ("t132_pow.y",              "@",    False),  # pow_int
+    ("t133_isqrt.y",            "7",    False),  # isqrt
+    # — 新功能测试 —
+    ("t134_char_literal.y",     "A",    False),  # 字符字面量
+    ("t135_char_literal_calc.y","C",    False),  # 字符字面量计算
+    ("t136_enum_basic.y",       "B",    False),  # enum 枚举
+    ("t137_enum_value.y",       "A",    False),  # enum 指定值
+    ("t138_typedef.y",          "A",    False),  # typedef
+    ("t139_const.y",            "A",    False),  # const
+    ("t140_ternary.y",          ":",    False),  # 三元运算符 true (10+48=58=':')
+    ("t141_ternary_false.y",    "8",    False),  # 三元运算符 false (8+48=56='8')
+    ("t142_for_dim.y",          ":",    False),  # for中DIM (10+48=58=':')
+    ("t143_chain_sub.y",        "5",    False),  # 连续减法 (5+48=53='5')
+    ("t144_chain_sub_var.y",    "<",    False),  # 变量连续减法 (12+48=60='<')
+    ("t145_const_fold.y",       "7",    False),  # 常量折叠 (7+48=55='7')
+    ("t146_perf_counter.y",     ":",    False),  # 性能计数 (10+48=58=':')
 ]
 
 _devnull = open(os.devnull, 'w')
@@ -162,11 +198,17 @@ def init_compiler():
     return compiler
 
 def compile_and_run(compiler, filepath):
+    Compoment.Cs = {}
     Compoment.unmatch = {}
+    _silence()
+    compiler.construct_componets(os.path.join(ROOT, "src", "Config.txt"))
+    _restore()
+
     with open(filepath, 'r', encoding='utf-8') as f:
         source = f.read()
 
     preprocesser = Preprocesser()
+    preprocesser.set_lib_dirs([os.path.join(ROOT, "lib")])
     preprocessed = preprocesser.process(source)
 
     _silence()

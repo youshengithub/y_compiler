@@ -6,7 +6,7 @@ REGS: @^EAX@# @^EBX@# @^ESP@# @^EBP@# @^EIP@# @^EFG@# @^ETP@ :NO_START# IS_KEYWO
 VAR: $REGS$  # @((^(?!struct$)(?!class)(?!void$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!out$)(?!outnum$)(?!else$)(?!func)(?!return)(?!struct$)(?!int$)(?!asm$)(?!double$)(?!break$)(?!continue$)(?!switch$)(?!case$)(?!default$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*)(\.(((?!struct$)(?!class$)(?!in$)(?!if$)(?!do$)(?!while$)(?!for$)(?!print$)(?!asm$)(?!else$)(?!func)(?!return$)(?!struct$)(?!int$)(?!double$)[A-Za-z][A-Za-z0-9_]*)(\[([a-z]{1,55}[0-9]{0,255}|[0-9]{1,255})\])*))*@ :NO_START# 
 CONST:@^<-|>[0-9]{1,255}@# :NO_START# 
 STRING:@^"([^"]|(\\"))*"@:NO_START# 
-OPN:$CALL$ # $ARRIDX$ # $VAR$ # $CONST$ # ($OP$) :NO_START# 
+OPN:$CALL$ # $ARRIDX$ # $VAR$ # $CONST$ # ($OP$) # $TERNARY$ :NO_START# 
 OP: $ADD$ # $SUB$ # $CALL$ # $AND$ # $OR$ # $XOR$ # $FACTOR$ :NO_START# 
 FACTOR: $MUL$ # $DIV$ # $MOD$ # $UNARY$ :NO_START#
 UNARY: $NOT$ # $GETP$ # $IN$ # $OPN$ :NO_START#
@@ -38,7 +38,7 @@ IF:if($COND$)$AREA$$ELIF$# if($COND$)$AREA$<else$AREA$|># :
 ELIF:elif($COND$)$AREA$$ELIF$# elif($COND$)$AREA$else$AREA$# elif($COND$)$AREA$# :NO_START# 
 DO:do$AREA$while($COND$)# :
 WHILE:while($COND$)$AREA$# :
-FOR:for($EQUAL$;$COND$;$EQUAL$)$AREA$ # for($EQUAL$;$COND$;$INCR$)$AREA$ # for($EQUAL$;$COND$;$DECR$)$AREA$ :
+FOR:for($EQUAL$;$COND$;$EQUAL$)$AREA$ # for($EQUAL$;$COND$;$INCR$)$AREA$ # for($EQUAL$;$COND$;$DECR$)$AREA$ # for($DIM$;$COND$;$EQUAL$)$AREA$ # for($DIM$;$COND$;$INCR$)$AREA$ # for($DIM$;$COND$;$DECR$)$AREA$ :
 SWITCH:switch($OPN$){$CASELIST$}:
 CASELIST:case$EMPTY$$CONST$:$SENTENCE$$CASELIST$ # case$EMPTY$$CONST$:$SENTENCE$ # default:$SENTENCE$:NO_START#
 PRINT:out($<OP|OPN>$)# :
@@ -50,9 +50,10 @@ tPAR: $DIM$,$tPAR$ # $DIM$  # :NO_START#
 PAR:$tPAR$:
 FUNCNAME:$TOKEN$:NO_START# 
 FUNC:$TYPE$$EMPTY$$FUNCNAME$(<$PAR$|>)$AREA$:
-RETURN:return$EMPTY$<$OP$|$OPN$|>:NO_START#
+RETURN:return$EMPTY$<$OP$|$OPN$> # return:NO_START#
 OPS:@^+@ # @^-@ # @^*@ # @^/@ # @^&@ # @^|@ # @^!@ # @^^@ # @^%@ :NO_START# 
 OPERATOR:$TYPE$--$OPS$--$FUNCNAME$(<$PAR$|>)$AREA$:
 ASM:asm($STRING$): NO_START
 ARRIDX:$VAR$[$OP$]:NO_START# 
+TERNARY:($COND$)?$<OP|OPN>$:$<OP|OPN>$:NO_START#
 EMPTY:@^\s+@:NO_START

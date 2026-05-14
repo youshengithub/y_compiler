@@ -61,6 +61,7 @@ class y_token:
         self.type=type  # 值类型，例如 "int"
         self.start_pos=start_pos
         self.muti_dimension=muti_dimension
+        self.is_param_array=False  # 是否为函数参数中的数组（指针语义）
     def set_as_structure(self,name,size,functions=[],vars=[]):  
         self.kind=token_type.structure
         self.size=size
