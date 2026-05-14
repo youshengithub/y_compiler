@@ -317,6 +317,17 @@ def Complie(name, rule, oplist, codelist, area_tree):
         elif rule == "$TERNARY$":
             for i in codelist:
                 code += i
+        elif rule == "$DEREF$":
+            for i in codelist:
+                code += i
+        elif rule == "$ADDROF$":
+            for i in codelist:
+                code += i
+        elif rule == "$SIZEOF$":
+            for i in codelist:
+                code += i
+        elif rule == "$NULLPTR$":
+            pass
         pass
 
     elif name == "TERNARY":
@@ -361,22 +372,25 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "DIM":
-        type_name = oplist[0]
-        var = y_token.trans_token(oplist[1])
-        num = 1
-        for i in var[1:]:
-            num *= int(i)
-        find_type = area_tree.find_token(type_name)
-        if find_type is None:
-            print("编译出错,类型未定义:", type_name)
-            assert(1 == 0)
+        # Check if this is a passthrough rule ($PTRDIM$ or $ARRINIT$)
+        if rule == "$PTRDIM$" or rule == "$ARRINIT$":
+            for i in codelist:
+                code += i
 
-        if rule == "$TYPE$$EMPTY$$TOKEN$":
+        elif rule == "$TYPE$$EMPTY$$TOKEN$":
+            type_name = oplist[0]
+            var = y_token.trans_token(oplist[1])
+            num = 1
+            for i in var[1:]:
+                num *= int(i)
+            find_type = area_tree.find_token(type_name)
+            if find_type is None:
+                print("编译出错,类型未定义:", type_name)
+                assert(1 == 0)
             start_pos = area_tree.clac_current_pos()
             t = y_token()
             dimensions = [int(i) for i in var[1:]]
             if _in_param_declaration and len(dimensions) > 0:
-                # 形参数组：只分配 1 个位置（存储传入的基地址指针）
                 t.set_as_variable(var[0], 1, type_name, start_pos, dimensions)
                 t.is_param_array = True
                 area_tree.append_var(t, 1)
@@ -387,7 +401,12 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
 
         elif rule == "$TYPE$$EMPTY$$TOKEN$=$OPN$":
-            # 常量/变量初始化: int a = 5; 或 int a = b;
+            type_name = oplist[0]
+            var = y_token.trans_token(oplist[1])
+            num = 1
+            for i in var[1:]:
+                num *= int(i)
+            find_type = area_tree.find_token(type_name)
             start_pos = area_tree.clac_current_pos()
             t = y_token()
             t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
@@ -396,29 +415,36 @@ def Complie(name, rule, oplist, codelist, area_tree):
             code += "MOV $" + str(start_pos) + " " + _addr(area_tree, oplist[2]) + "\n"
 
         elif rule == "$TYPE$$EMPTY$$TOKEN$=$OP$":
-            # 表达式初始化: int a = b + c; 或 int a = 65;
+            type_name = oplist[0]
+            var = y_token.trans_token(oplist[1])
+            num = 1
+            for i in var[1:]:
+                num *= int(i)
+            find_type = area_tree.find_token(type_name)
             start_pos = area_tree.clac_current_pos()
             t = y_token()
             t.set_as_variable(var[0], find_type.size * num, type_name, start_pos, [int(i) for i in var[1:]])
             area_tree.append_var(t, t.size)
             code = "ALLOC " + str(start_pos + t.size) + "//" + type_name + "\n"
-            # OP 代码在 codelist 最后一个元素（前面是 TYPE/EMPTY/TOKEN 的空代码）
             real_code = codelist[-1] if codelist else ""
             if real_code.strip() not in ("", "NOP"):
-                # 有实际表达式代码，结果在 EAX
                 code += real_code
                 code += "MOV $" + str(start_pos) + " EAX\n"
             else:
-                # 简单常量/变量，直接 MOV
                 code += "MOV $" + str(start_pos) + " " + _addr(area_tree, oplist[2]) + "\n"
 
         elif rule == "$TYPE$$EMPTY$$TOKEN$=$STRING$":
+            type_name = oplist[0]
+            var = y_token.trans_token(oplist[1])
+            num = 1
+            for i in var[1:]:
+                num *= int(i)
+            find_type = area_tree.find_token(type_name)
             assert(type_name == "int" or type_name == "double")
             string = oplist[2]
             length = num
             if length < len(string):
                 length = len(string)
-            code = "ALLOC " + str(length) + "//" + type_name + "\n"
             base = area_tree.clac_current_pos()
             t = y_token()
             t.set_as_variable(var[0], find_type.size * num, type_name, base, [int(i) for i in var[1:]])
@@ -561,7 +587,6 @@ def Complie(name, rule, oplist, codelist, area_tree):
             code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
             code += "MOD EAX " + _addr(area_tree, oplist[1]) + "\n"
         elif not left_has and right_has:
-            # 左叶子 % 右表达式(EAX)
             code = right_code
             code += "MOV EBX EAX\n"
             code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
@@ -575,6 +600,50 @@ def Complie(name, rule, oplist, codelist, area_tree):
             code += left_code
             code += "MOD EAX EBX\n"
 
+    elif name == "SHL":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SHL EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SHL EAX EBX\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "SHL EAX " + _addr(area_tree, oplist[-1]) + "\n"
+        else:
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "SHL EAX EBX\n"
+
+    elif name == "SHR":
+        left_code = codelist[0] if len(codelist) > 0 else ""
+        right_code = codelist[1] if len(codelist) > 1 else ""
+        left_has = left_code.strip() not in ("", "NOP")
+        right_has = right_code.strip() not in ("", "NOP")
+        if not left_has and not right_has:
+            code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SHR EAX " + _addr(area_tree, oplist[1]) + "\n"
+        elif not left_has and right_has:
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+            code += "SHR EAX EBX\n"
+        elif left_has and not right_has:
+            code = left_code
+            code += "SHR EAX " + _addr(area_tree, oplist[-1]) + "\n"
+        else:
+            code = right_code
+            code += "MOV EBX EAX\n"
+            code += left_code
+            code += "SHR EAX EBX\n"
+
     elif name == "NOT":
         if rule == "!$OPN$":
             code = "NOT EAX " + _addr(area_tree, oplist[0]) + "\n"
@@ -584,17 +653,101 @@ def Complie(name, rule, oplist, codelist, area_tree):
             code += "NOT EAX EBX\n"
         pass
 
+    elif name == "NULLPTR":
+        # NULL → 0
+        code = "MOV EAX 0\n"
+
+    elif name == "SIZEOF":
+        # sizeof(type) → 返回类型大小
+        type_name = oplist[0]
+        find_type = area_tree.find_token(type_name)
+        if find_type is not None:
+            code = "MOV EAX " + str(find_type.size) + "\n"
+        else:
+            code = "MOV EAX 1\n"  # 默认大小为1
+
+    elif name == "DEREF":
+        # *ptr → 读取指针指向的值: memory[ptr_value]
+        if rule == "*$OPN$":
+            addr = _addr(area_tree, oplist[0])
+            code = "MOV EAX " + addr + "\n"
+            code += "LEA EAX EAX\n"  # EAX = memory[EAX]
+        elif rule == "*$OP$":
+            inner_code = codelist[0] if codelist else ""
+            if inner_code.strip() and inner_code.strip() != "NOP":
+                code = inner_code
+                code += "LEA EAX EAX\n"
+            else:
+                # OP with no code (simple variable/constant)
+                addr = _addr(area_tree, oplist[0])
+                code = "MOV EAX " + addr + "\n"
+                code += "LEA EAX EAX\n"
+
+    elif name == "ADDROF":
+        # &var → 获取变量的绝对地址
+        var_name = oplist[0]
+        tk = area_tree.find_token(var_name)
+        if tk is not None and hasattr(tk, "start_pos"):
+            # 检查是否全局变量
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top: break
+                search = search.father
+            is_global = (var_top is not None and var_top is not current_top)
+            if is_global:
+                code = "MOV EAX " + str(tk.start_pos) + "\n"
+            else:
+                code = "MOV EAX EBP\n"
+                code += "ADD EAX " + str(tk.start_pos) + "\n"
+        else:
+            code = "MOV EAX 0\n"
+
     elif name == "GETP":
-        code += "LEA EAX " + str(oplist[0]) + "\n"
-        pass
+        # &var → 获取变量的绝对地址（等同于 ADDROF）
+        var_name = oplist[0]
+        tk = area_tree.find_token(var_name)
+        if tk is not None and hasattr(tk, "start_pos"):
+            # 检查是否全局变量
+            current_top = area_tree.find_top_father()
+            search = area_tree
+            var_top = None
+            while search is not None:
+                if hasattr(search, "vars"):
+                    for v in search.vars:
+                        if v is tk:
+                            var_top = search.find_top_father() if hasattr(search, 'find_top_father') else search
+                            break
+                if var_top: break
+                search = search.father
+            is_global = (var_top is not None and var_top is not current_top)
+            if is_global:
+                code = "MOV EAX " + str(tk.start_pos) + "\n"
+            else:
+                code = "MOV EAX EBP\n"
+                code += "ADD EAX " + str(tk.start_pos) + "\n"
+        else:
+            code = "MOV EAX 0\n"
 
     elif name == "SETP":
         if rule == "*$OPN$":
-            code += "PUSH " + str(oplist[0]) + "\n"
+            code += "PUSH " + _addr(area_tree, oplist[0]) + "\n"
         elif rule == "*$OP$":
+            inner_code = ""
             for i in codelist:
-                code += i
-            code += "PUSH EAX\n"
+                inner_code += i
+            if inner_code.strip() and inner_code.strip() != "NOP":
+                code = inner_code
+                code += "PUSH EAX\n"
+            else:
+                # Simple variable through OP path
+                code = "PUSH " + _addr(area_tree, oplist[0]) + "\n"
         pass
 
     elif name == "EQUAL":
@@ -653,6 +806,28 @@ def Complie(name, rule, oplist, codelist, area_tree):
             else:
                 code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
                 code += "MOD EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "~shla~" in rule:
+            if rhs_has_code:
+                code = rhs_code
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SHL EAX EBX\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SHL EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+        elif "~shra~" in rule:
+            if rhs_has_code:
+                code = rhs_code
+                code += "MOV EBX EAX\n"
+                code += "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SHR EAX EBX\n"
+                code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
+            else:
+                code = "MOV EAX " + _addr(area_tree, oplist[0]) + "\n"
+                code += "SHR EAX " + _addr(area_tree, oplist[-1]) + "\n"
                 code += "MOV " + _addr(area_tree, oplist[0]) + " EAX\n"
         elif "=$OPN$" in rule or (not rhs_has_code and "$SETP$" not in rule and "$ARRIDX$" not in rule):
             code = "MOV " + _addr(area_tree, oplist[0]) + " " + _addr(area_tree, oplist[-1]) + "\n"
@@ -721,7 +896,7 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 for i in codelist:
                     code += i
                 code += "POP EBX\n"
-                code += "SEA EBX " + str(oplist[-1]) + "\n"
+                code += "SEA EBX " + _addr(area_tree, oplist[-1]) + "\n"
             else:
                 for i in codelist:
                     code += i
@@ -752,6 +927,80 @@ def Complie(name, rule, oplist, codelist, area_tree):
     elif name == "SENTENCE":
         for i in codelist:
             code += i
+    elif name == "PTRDIM":
+        # 指针变量声明：int *p = expr; 或 int *p;
+        type_name = oplist[0]
+        var_name = oplist[1] if len(oplist) > 1 else oplist[0]
+        # 在 oplist 中找到变量名（TYPE 之后的 TOKEN）
+        # oplist: [type, var_name] 或 [type, var_name, init_value]
+        # 指针只占 1 个内存单元（存储地址）
+        start_pos = area_tree.clac_current_pos()
+        t = y_token()
+        t.set_as_variable(var_name, 1, type_name + "*", start_pos, [])
+        t.is_pointer = True
+        area_tree.append_var(t, 1)
+        code = "ALLOC " + str(start_pos + 1) + "//" + type_name + "*\n"
+        # 如果有初始化表达式
+        if len(codelist) > 0:
+            init_code = codelist[-1] if codelist else ""
+            if init_code.strip() and init_code.strip() != "NOP":
+                code += init_code
+                code += "MOV $" + str(start_pos) + " EAX\n"
+            elif len(oplist) > 2:
+                code += "MOV $" + str(start_pos) + " " + _addr(area_tree, oplist[-1]) + "\n"
+
+    elif name == "ARRINIT":
+        # 数组字面量初始化：int a[] = {1, 2, 3};
+        type_name = oplist[0]
+        var = y_token.trans_token(oplist[1])
+        var_name = var[0]
+        find_type = area_tree.find_token(type_name)
+        if find_type is None:
+            print("编译出错,类型未定义:", type_name)
+            assert(1 == 0)
+        # 收集初始化列表中的值
+        init_vals = oplist[2:]  # INITLIST 中的值
+        arr_size = len(init_vals)
+        if len(var) > 1 and var[1].isdigit():
+            declared_size = int(var[1])
+            arr_size = max(arr_size, declared_size)
+        start_pos = area_tree.clac_current_pos()
+        t = y_token()
+        t.set_as_variable(var_name, arr_size, type_name, start_pos, [arr_size])
+        area_tree.append_var(t, arr_size)
+        code = "ALLOC " + str(start_pos + arr_size) + "//" + type_name + "\n"
+        # 逐个初始化
+        for idx, val in enumerate(init_vals):
+            # 检查是否有对应的代码（表达式初始化）
+            if idx < len(codelist) and codelist[idx].strip() and codelist[idx].strip() != "NOP":
+                code += codelist[idx]
+                code += "MOV $" + str(start_pos) + ":" + str(idx) + " EAX\n"
+            else:
+                code += "MOV $" + str(start_pos) + ":" + str(idx) + " " + _addr(area_tree, val) + "\n"
+
+    elif name == "INITLIST":
+        # 透传初始化列表中的表达式代码
+        for i in codelist:
+            code += i
+
+    elif name == "FREESTMT":
+        # free(ptr) — 释放指针指向的内存
+        if len(codelist) > 0 and codelist[0].strip() and codelist[0].strip() != "NOP":
+            code = codelist[0]
+            code += "FREE EAX\n"
+        else:
+            code = "FREE " + _addr(area_tree, oplist[0]) + "\n"
+
+    elif name == "FUNCDECL":
+        # 函数前置声明：只注册签名到符号表，不生成代码
+        t = y_token()
+        par = []
+        for i in codelist[0].split("\n") if codelist else []:
+            if i != "" and len(i.split("//")) == 2:
+                par.append(i.split("//")[1])
+        t.set_as_function(oplist[0], oplist[1], par)
+        area_tree.append_var(t)
+
     elif name == "ARRIDX":
         # $VAR$[$OP$] — oplist[0] = 数组名, codelist[1] = 索引表达式代码
         arr_name = oplist[0]
@@ -1038,8 +1287,36 @@ def Complie(name, rule, oplist, codelist, area_tree):
         pass
 
     elif name == "CALL":
+        # 检测指针方法调用 ptr->method()
+        if rule == "$TOKEN$~arrow~$CALL$":
+            # ptr->method() — 解引用指针然后调用方法
+            ptr_name = oplist[0]
+            ptr_tk = area_tree.find_token(ptr_name)
+            if ptr_tk is not None:
+                # 获取指针指向的结构体类型
+                ptr_type = getattr(ptr_tk, 'type', '')
+                struct_type_name = ptr_type.replace('*', '') if ptr_type else ''
+                struct_tk = area_tree.find_token(struct_type_name)
+                if struct_tk is not None and struct_tk.kind == token_type.structure:
+                    inner_code = ""
+                    for i in codelist:
+                        inner_code += i
+                    marker = "MOV ETP ESP\n"
+                    if marker in inner_code:
+                        idx = inner_code.index(marker) + len(marker)
+                        ptr_addr = _addr(area_tree, ptr_name)
+                        this_push = "PUSH " + ptr_addr + "\n"
+                        code = inner_code[:idx] + this_push + inner_code[idx:]
+                    else:
+                        code = inner_code
+                else:
+                    for i in codelist:
+                        code += i
+            else:
+                for i in codelist:
+                    code += i
         # 检测方法调用 obj.method()
-        if rule == "$TOKEN$.$CALL$":
+        elif rule == "$TOKEN$.$CALL$":
             # 成员方法调用 — obj.method(args)
             # oplist[0] 是对象名（外层TOKEN）
             # codelist 中包含内层 CALL 已经完整生成的调用代码
@@ -1075,31 +1352,77 @@ def Complie(name, rule, oplist, codelist, area_tree):
                 for i in codelist:
                     code += i
         else:
-            # 普通函数调用
-            # 保存区布局（相对 EBP 的负偏移）：
-            # [-7]: ESP, [-6]: EBP, [-5]: EAX, [-4]: EBX, [-3]: EFG, [-2]: ETP, [-1]: 返回地址
-            code = "PUSH ESP\n"       # [-7]
-            code += "PUSH EBP\n"      # [-6]
-            code += "PUSH EAX\n"      # [-5]
-            code += "PUSH EBX\n"      # [-4]
-            code += "PUSH EFG\n"      # [-3]
-            code += "PUSH ETP\n"      # [-2]
-            code += "ADD ESP 1\n"     # [-1] 为返回地址预留
-            code += "MOV ETP ESP\n"   # ETP = 新栈帧基址
-            # 压入参数（codelist中可能有TOKEN的空代码和ARG的参数代码）
-            for c_item in codelist:
-                if c_item.strip() and c_item.strip() != "NOP":
-                    code += c_item
+            # 检查是否为内置函数
+            func_name = oplist[0]
+            if func_name == "malloc":
+                # malloc(size) — 内置堆分配，返回地址在EAX
+                # tARG 生成的代码是 PUSH xxx，我们需要提取参数值
+                arg_code = ""
+                for c_item in codelist:
+                    if c_item.strip() and c_item.strip() != "NOP":
+                        arg_code += c_item
+                # 把 PUSH 替换为 MOV EBX（我们需要参数值而非压栈）
+                if arg_code:
+                    # 将所有 PUSH xxx\n 改为 MOV EBX xxx\n
+                    import re
+                    code = re.sub(r'PUSH (.+)\n', r'MOV EBX \1\n', arg_code)
+                    code += "MALLOC EAX EBX\n"
+                else:
+                    code = "MALLOC EAX " + _addr(area_tree, oplist[-1]) + "\n"
+            elif func_name == "free":
+                # free(ptr)
+                arg_code = ""
+                for c_item in codelist:
+                    if c_item.strip() and c_item.strip() != "NOP":
+                        arg_code += c_item
+                if arg_code:
+                    import re
+                    code = re.sub(r'PUSH (.+)\n', r'MOV EAX \1\n', arg_code)
+                    code += "FREE EAX\n"
+                else:
+                    code = "MOV EAX " + _addr(area_tree, oplist[-1]) + "\n"
+                    code += "FREE EAX\n"
+            elif func_name == "printf":
+                # printf(fmt, args...) — 格式化输出
+                # 这里简化处理：将所有参数压栈后调用 PRINTF
+                # 实际上 printf 的第一个参数是格式字符串地址
+                arg_code = ""
+                for c_item in codelist:
+                    if c_item.strip() and c_item.strip() != "NOP":
+                        arg_code += c_item
+                # 计算参数个数（通过 PUSH 指令数量）
+                push_count = arg_code.count("PUSH ")
+                # 格式字符串地址在第一个参数
+                code = arg_code
+                # 用简化的 OUTNUM/OUT 序列代替（因为我们无法在编译期解析格式串）
+                # 实际 printf 支持需要运行时解析，此处直接透传参数
+                code += "PRINTF EAX " + str(push_count) + "\n"
+            else:
+                # 普通函数调用
+                # 保存区布局（相对 EBP 的负偏移）：
+                # [-7]: ESP, [-6]: EBP, [-5]: EAX, [-4]: EBX, [-3]: EFG, [-2]: ETP, [-1]: 返回地址
+                code = "PUSH ESP\n"       # [-7]
+                code += "PUSH EBP\n"      # [-6]
+                code += "PUSH EAX\n"      # [-5]
+                code += "PUSH EBX\n"      # [-4]
+                code += "PUSH EFG\n"      # [-3]
+                code += "PUSH ETP\n"      # [-2]
+                code += "ADD ESP 1\n"     # [-1] 为返回地址预留
+                code += "MOV ETP ESP\n"   # ETP = 新栈帧基址
+                # 压入参数
+                for c_item in codelist:
+                    if c_item.strip() and c_item.strip() != "NOP":
+                        code += c_item
 
-            # 保存返回地址到 [-1] 位置（ETP-1）
-            code += "MOV EAX EIP\n"
-            code += "ADD EAX 7\n"       # 返回到JMP之后（MOV EIP绝对跳转）
-            code += "MOV EBX ETP\n"
-            code += "SUB EBX 1\n"
-            code += "SEA EBX EAX\n"   # memory[ETP-1] = 返回地址
+                # 保存返回地址
+                code += "MOV EAX EIP\n"
+                code += "ADD EAX 7\n"
+                code += "MOV EBX ETP\n"
+                code += "SUB EBX 1\n"
+                code += "SEA EBX EAX\n"
 
-            code += "MOV EBP ETP\n"
-            code += "JMP @" + oplist[0] + "\n"
+                code += "MOV EBP ETP\n"
+                code += "JMP @" + func_name + "\n"
         pass
 
     elif name == "tPAR":
