@@ -856,9 +856,11 @@ def Complie(name, rule, oplist, codelist, area_tree):
             idx_code = codelist[0] if len(codelist) > 0 else ""
             rhs_code_part = codelist[-1] if len(codelist) > 1 else ""
             rhs_has = rhs_code_part.strip() not in ("", "NOP")
-            idx_has = idx_code.strip() not in ("", "NOP")
+            # 只有当 ARRIDX 代码包含 LEA（表达式下标地址计算）时才走地址模式
+            # 简单下标的 ARRIDX 代码只是 "MOV EAX value"，不含 LEA
+            idx_has_addr = idx_code.strip() not in ("", "NOP") and "LEA EAX EAX" in idx_code
             
-            if idx_has:
+            if idx_has_addr:
                 # 去掉 ARRIDX 生成的 LEA（获取地址而非值）
                 addr_code = idx_code.replace("LEA EAX EAX\n", "")
                 if rhs_has:

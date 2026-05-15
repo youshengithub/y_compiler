@@ -199,6 +199,33 @@ TEST_CASES = [
     ("t163_struct_ptr.y",       "53",   False),  # 结构体访问
     ("t164_ptr_chain.y",        "100",  False),  # 指针链
     ("t165_malloc_free.y",      "AB",   False),  # 堆分配+释放
+
+    # === 复杂综合测试 (t166-t190) ===
+    ("t166_matrix_multiply.y",  "69",   False),  # 矩阵乘法
+    ("t167_fast_power.y",       "1024", False),  # 快速幂
+    ("t168_sort_search.y",      "2",    False),  # 选择排序+线性查找
+    ("t169_hanoi.y",            "63",   False),  # 递归汉诺塔
+    ("t170_stack_struct.y",     "60",   False),  # 栈数据结构(OOP)
+    ("t171_malloc_insertion_sort.y", "5", False), # malloc+插入排序
+    ("t172_prime_sieve.y",      "15",   False),  # 素数筛法
+    ("t173_combination.y",      "56",   False),  # 递归组合数
+    ("t174_multi_func.y",       "10",   False),  # 多函数互调
+    ("t175_vector_class.y",     "36",   False),  # OOP向量运算
+    ("t176_linked_list_malloc.y","60",  False),  # 动态链表(malloc)
+    ("t177_bitset.y",           "8",    False),  # 位运算集合
+    ("t178_ackermann.y",        "9",    False),  # Ackermann函数
+    ("t179_hash_table.y",       "24",   False),  # 哈希表(开放寻址)
+    ("t180_state_machine.y",    "1",    False),  # 状态机正则匹配
+    ("t181_nqueens.y",          "2",    False),  # 4皇后回溯
+    ("t182_knapsack.y",         "10",   False),  # 0/1背包DP
+    ("t183_count_vowels.y",     "3",    False),  # 字符串元音统计
+    ("t184_ternary_ptr.y",      "3,9",  False),  # 三元+指针+函数
+    ("t185_lis.y",              "4",    False),  # 最长递增子序列
+    ("t186_grade_system.y",     "91",   False),  # 学生成绩系统(OOP)
+    ("t187_bfs_graph.y",        "5",    False),  # 图BFS遍历
+    ("t188_quicksort.y",        "5",    False),  # 递归快排
+    ("t189_postfix_eval.y",     "9",    False),  # 后缀表达式求值
+    ("t190_mergesort.y",        "10",   False),  # 递归归并排序
 ]
 
 _devnull = open(os.devnull, 'w')
